@@ -303,17 +303,22 @@ struct MainView: View {
                     .allowsHitTesting(terminalToolsVisible)
                     .accessibilityHidden(!terminalToolsVisible)
             }
-            if store.section == "hosts", let host = inspectorHost {
-                Rectangle().fill(Palette.border).frame(width: 1, height: height)
-                HostEditor(host: host, isNew: !store.workspace.hosts.contains(where: { $0.id == host.id })) { inspectorHost = nil; selectedHost = nil }
-                    .id(host.id).frame(width: 340, height: height).background(Palette.sidebar)
-            } else if store.section == "hosts", let group = inspectorGroup {
-                Rectangle().fill(Palette.border).frame(width: 1, height: height)
-                GroupEditor(value: group, isNew: !store.groups.contains { CatalogNames.matches($0, group.name) }) { inspectorGroup = nil }
-                    .id(group.id).frame(width: 340, height: height).background(Palette.sidebar)
+            if store.section == "hosts", inspectorHost != nil || inspectorGroup != nil {
+                HStack(spacing: 0) {
+                    Rectangle().fill(Palette.border).frame(width: 1, height: height)
+                    if let host = inspectorHost {
+                        HostEditor(host: host, isNew: !store.workspace.hosts.contains(where: { $0.id == host.id })) { inspectorHost = nil; selectedHost = nil }
+                            .id(host.id).frame(width: 340, height: height).background(Palette.sidebar)
+                    } else if let group = inspectorGroup {
+                        GroupEditor(value: group, isNew: !store.groups.contains { CatalogNames.matches($0, group.name) }) { inspectorGroup = nil }
+                            .id(group.id).frame(width: 340, height: height).background(Palette.sidebar)
+                    }
+                }
+                .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
             }
         }.frame(width: width, height: height, alignment: .topLeading).clipped()
             .animation(store.section == "terminal" && !reduceMotion ? .easeInOut(duration: 0.24) : nil, value: terminalToolsVisible)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: inspectorWidth)
     }
     var workspaceTabsWidth: CGFloat {
         WorkspaceTabStripSizing.contentWidth(sessionWidths: store.terminalTabs.map {
@@ -768,6 +773,7 @@ struct HostEditor: View {
             }
             Rectangle().fill(Palette.border).frame(height: 1)
             HStack(spacing: 10) {
+                SSHConnectionTestControl(host: host, material: inheritsAuthentication || host.credentialID != nil ? nil : Secrets.Value(secret: secret, privateKey: privateKeyText))
                 Button(store.text("Save", "保存")) { save(connect: false) }.buttonStyle(ChromeButtonStyle()).keyboardShortcut(.return, modifiers: .command)
                 Button { save(connect: true) } label: { Label(store.text("Connect", "连接"), systemImage: "terminal") }.buttonStyle(ChromeButtonStyle(prominent: true))
             }.frame(maxWidth: .infinity).padding(16).disabled(!secretLoaded || (!portValid && host.groupInheritance?.port != true) || formValidationError != nil)

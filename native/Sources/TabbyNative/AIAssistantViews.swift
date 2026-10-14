@@ -168,8 +168,11 @@ struct AIAssistantPane: View {
                 if ai.pendingQuestion == nil { HStack(spacing: 8) {
                     Button { if voice.recording || !voice.transcript.isEmpty { voice.finish { text in if !text.isEmpty { ai.question += (ai.question.isEmpty ? "" : "\n") + text } } } else { voice.start(chinese: store.chinese) } } label: { Label((voice.recording || !voice.transcript.isEmpty) ? store.text("Insert dictation", "插入听写") : store.text("Voice input", "语音输入"), systemImage: voice.recording ? "stop.circle" : "mic") }.buttonStyle(ChromeButtonStyle()).disabled(ai.pendingQuestion != nil).accessibilityIdentifier("axon-ai-voice")
                     if voice.recording || !voice.transcript.isEmpty { Button(store.text("Discard", "放弃")) { voice.stop() }.buttonStyle(ChromeButtonStyle()) }
-                    Text(voice.recording ? voice.transcript : localized(voice.status)).font(.system(size: 10)).foregroundStyle(Palette.muted).lineLimit(2)
+
                 } }
+                if ai.pendingQuestion == nil && (!voice.status.isEmpty || !voice.transcript.isEmpty) {
+                    AIVoiceStatusView(message: voice.recording ? voice.transcript : localized(voice.status), settingsURL: voice.settingsURL, chinese: store.chinese)
+                }
                 if ai.messageTooLong {
                     Text(store.text("Message too long (maximum 24 KB). Shorten it or use @ file references.", "消息过长（每条最多 24 KB），请缩短内容或使用 @ 文件引用。"))
                         .font(.system(size: 11)).foregroundStyle(Palette.danger).fixedSize(horizontal: false, vertical: true)

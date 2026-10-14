@@ -5,6 +5,57 @@ import SwiftTerm
 @testable import TabbyNative
 
 @MainActor final class WorkspaceNavigationTests: XCTestCase {
+    func testHostInspectorAnimatesOpeningAndClosingWithoutResizingWindow() async throws {
+        _ = NSApplication.shared
+        let restore = enableAccessibility(); defer { restore() }
+        for width: CGFloat in [1050, 1400] {
+            let store = AppStore(fileURL: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+            store.workspace.preferences.language = "en-US"
+            var host = TabbyNative.Host(); host.name = "Inspector animation fixture"; host.address = "fixture.invalid"
+            store.workspace.hosts = [host]
+            let hosting = NSHostingView(rootView: MainView().environmentObject(store).preferredColorScheme(.light))
+            let window = show(hosting, size: NSSize(width: width, height: 900))
+            defer { window.close(); store.monitoring.stop() }
+            try await settle(hosting)
+            let originalFrame = window.frame
+            func searchWidth() throws -> CGFloat {
+                try XCTUnwrap(find(NSTextField.self, in: hosting).first { $0.placeholderString == "Find a host or ssh user@hostname…" }).frame.width
+            }
+            let expandedCenter = try searchWidth()
+            let edit = try XCTUnwrap(find(HostCardNativeActionButton.self, in: hosting).first { $0.identifier?.rawValue == "axon-host-edit-" + host.id.uuidString })
+            edit.performClick(nil)
+            var opening: [CGFloat] = []
+            for pause in [30, 40, 50] {
+                try await Task.sleep(for: .milliseconds(pause)); hosting.layoutSubtreeIfNeeded()
+                opening.append(try searchWidth())
+            }
+            try await Task.sleep(for: .milliseconds(220)); try await settle(hosting)
+            let collapsedCenter = try searchWidth()
+            XCTAssertEqual(expandedCenter - collapsedCenter, 341, accuracy: 2)
+            if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                XCTAssertTrue(opening.contains { $0 > collapsedCenter + 2 && $0 < expandedCenter - 2 }, "Opening must have intermediate layout frames: \(opening)")
+            }
+            try captureAndAudit(hosting, name: "host-inspector-open-\(Int(width))")
+            let close = try XCTUnwrap(nodes(hosting).first { $0.role == .button && $0.text == "Close details" })
+            let selector = NSSelectorFromString("accessibilityPerformPress")
+            typealias Press = @convention(c) (AnyObject, Selector) -> Bool
+            XCTAssertTrue(unsafeBitCast(close.object.method(for: selector), to: Press.self)(close.object, selector))
+            var closing: [CGFloat] = []
+            for pause in [30, 40, 50] {
+                try await Task.sleep(for: .milliseconds(pause)); hosting.layoutSubtreeIfNeeded()
+                closing.append(try searchWidth())
+            }
+            try await Task.sleep(for: .milliseconds(220)); try await settle(hosting)
+            if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                XCTAssertTrue(closing.contains { $0 > collapsedCenter + 2 && $0 < expandedCenter - 2 }, "Closing must have intermediate layout frames: \(closing)")
+            }
+            XCTAssertEqual(try searchWidth(), expandedCenter, accuracy: 2)
+            XCTAssertEqual(window.frame, originalFrame)
+            XCTAssertTrue(store.sessions.isEmpty)
+            try captureAndAudit(hosting, name: "host-inspector-closed-\(Int(width))")
+        }
+    }
+
     func testLauncherTabIsConsumedWhenOpeningHost() async throws {
         _ = NSApplication.shared
         for width: CGFloat in [1050, 1400] {

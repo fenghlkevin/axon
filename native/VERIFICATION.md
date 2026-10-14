@@ -1812,3 +1812,49 @@ Running after: 12973
 - 已先备份原版 0.19.23 到 native/dist/backups/Axon-before-0.19.25-20261014.app，再暂存校验并原子替换 /Applications/Axon.app。
 - 安装后严格签名校验、版本 0.19.25 (190) 与可执行文件 SHA-256 比对通过，保留白色图标。回执 native/dist/installation-0.19.25.txt。
 - 未退出、启动或重启 Axon，现有连接未操作。用户主动重启并新建终端连接后使用修复版。
+
+## 2026-10-14 — 0.19.26 (191), voice input recovery
+
+- Confirmed in the actual macOS Keyboard settings UI that Dictation is off, matching the screenshot's system speech error. Left settings on Keyboard; enabling Dictation awaits user consent. No system privacy settings changed.
+- Map Speech `kLSRErrorDomain/201` to localized instructions and a Keyboard settings action. Missing language assets and permission denial have recovery instructions; recognition failures stop capture and invalidate stale callbacks. Dictation continues to edit drafts only.
+- Status text now wraps below controls. Viewed actual NSHostingView renders at 280/480pt: `/tmp/axon-voice-recovery/280.png`, `/tmp/axon-voice-recovery/480.png`. Neither text nor settings button is clipped. Tested the rendered settings button through accessibility with an injected URL opener; did not launch a real microphone capture.
+- Three targeted tests passed: AIVoiceRecoveryTests (2), AISessionCollaborationTests.testVoicePermissionDenialAndCancellationNeverRecord (1). Live speech recognition remains unverified until system Dictation is enabled and audio is supplied.
+- Release package built: `native/dist/Axon-0.19.26-mac-arm64.zip`. Strict deep codesign verification passed outside the sandbox (sandbox verification could not read trust information); ZIP integrity passed; git diff --check passed. Existing unrelated dependency/concurrency compiler warnings remain.
+- Not installed; running Axon and SSH/SFTP sessions were not restarted or interrupted.
+
+### System Dictation follow-up
+
+- User authorized enabling Dictation and explicitly accepted the macOS notice about sending voice input/contact names to Apple.
+- On returning to Keyboard settings, the live accessibility UI already reported Dictation `on`, with Chinese (Mandarin, Mainland China) selected. No further toggle was necessary. Actual audio transcription remains unverified; the running Axon was not restarted.
+
+## 2026-10-14 · 主机编辑连接测试 · 0.19.27 (192)
+
+- 在主机编辑底部固定操作区新增“连接测试”，使用当前未保存的主机配置和独立凭据；共享/分组认证继续从正确的钥匙串所有者读取。
+- 复用现有 SSH 认证、Agent、证书、主机指纹确认及跳板连接逻辑；只建立认证连接，不打开 shell、不执行命令、不自动保存主机。成功或异常均关闭已建立的测试连接，按钮显示测试中并禁止重复启动，结果以成功/失败弹窗呈现。
+- 测试：ConnectionAuthenticationTests 11 项通过；SSHConnectionTestTests 4 项通过（草稿覆盖、不保存、无效跳板路线、NSHostingView 渲染）。git diff --check 通过。
+- 已生成并亲自打开查看真实 NSHostingView 截图：/tmp/axon-test-footer-340.png、/tmp/axon-test-footer-440.png，底部三个操作在窄/常用面板宽度均无裁切；/tmp/axon-host-editor-test.png 为 360×850 主机面板长名称截图。完整面板的缓存截图部分 SwiftUI 控件文字未捕获，底部独立截图文字正常；不把缓存截图视为完整应用交互验收。
+- 未连接用户服务器；真实 SSH 成功登录、运行中状态和原生结果弹窗的实际点击路径尚未验收。
+- release 打包完成：native/dist/Axon-0.19.27-mac-arm64.zip。codesign --verify --deep --strict 在可访问系统证书信任的环境通过；unzip -t 通过。
+- 未安装、未重启应用，保留现有会话。
+
+### 0.19.27 安装补充
+
+- 用户明确授权安装并要求不重启、保留连接。已备份旧版 0.19.25 (190) 到 native/dist/backups/Axon-0.19.25-190-20261014-144511.app。
+- 已通过 install-current.py 将校验后的 0.19.27 (192) 原子替换到 /Applications/Axon.app；暂存与安装后签名、可执行文件 SHA-256 及 ZIP 完整性校验通过，保留用户白色图标。
+- 没有发送退出、终止、启动或重启操作。按 /Applications 可执行文件路径检查未发现运行进程，因此不宣称已验证现有 SSH 会话状态；新版将在用户下次启动应用时加载。
+
+## 2026-10-14 · 连接测试成功反馈 · 0.19.28 (193)
+
+- 按用户反馈移除成功弹窗，测试通过后原按钮呈绿色、勾号及“测试通过”，仍可点击重新测试；测试中禁用并显示进度，失败保留错误原因弹窗。
+- 主机草稿、独立凭据、共享凭据、分组及跳板主机配置变化时清除成功标记；测试期间配置变化后忽略旧请求反馈。
+- SSHConnectionTestTests 4 项通过，git diff --check 通过。NSHostingView 渲染并亲自打开查看 /tmp/axon-test-footer-340-false-true.png 与 /tmp/axon-test-footer-340-true-false.png，成功及执行状态在 340pt 窄面板无裁切，成功按钮绿色并带勾号和文字。未在用户服务器额外发起测试，原生失败弹窗点击路径本次未重验。
+- release 构建与严格签名、ZIP 完整性校验通过。已备份 0.19.27 (192) 到 native/dist/backups/Axon-0.19.27-192-20261014-145112.app，再暂存校验及原子安装 0.19.28 (193) 到 /Applications/Axon.app，安装后签名与 SHA-256 通过。
+- 未退出、启动或重启应用，安装前后 TabbyNative PID 均为 75421。当前进程继续使用旧版；用户主动重启后加载新版。
+
+## 2026-10-14 · 主机详情面板展开动画 · 0.19.29 (194)
+
+- 右侧主机/分组详情与分隔线组成统一过渡容器，打开从右侧滑入并淡入，关闭反向退出；中心主机库同步调整宽度，easeInOut 0.24 秒。遵循系统 Reduce Motion，开启时无滑移动画。
+- 新增真实 MainView/AppKit 窗口测试 testHostInspectorAnimatesOpeningAndClosingWithoutResizingWindow，通过 1050/1400pt 窗口主机编辑按钮打开和无障碍关闭动作，分别采样展开/收起中间布局宽度，最终分配宽度差 341pt，窗口位置与尺寸保持。1 项测试通过，git diff --check 通过。
+- 已生成并亲自打开实际渲染截图 /tmp/axon-inspector-194/host-inspector-open-1050.png、host-inspector-closed-1400.png；实际截图与无障碍布局审计覆盖开/关两种窗口宽度。动画存在由实际中间帧布局采样验证，不仅依靠静态截图。没有向用户服务器发起连接或命令。
+- release 0.19.29 (194) 构建、严格签名和 ZIP 完整性校验通过，暂存校验后原子安装到 /Applications/Axon.app。旧版备份 native/dist/backups/Axon-0.19.28-193-20261014-145658.app。
+- 未退出、启动或重启应用；安装前后运行 PID 均为 75421，保留当前进程。用户主动重启后加载新版动画。

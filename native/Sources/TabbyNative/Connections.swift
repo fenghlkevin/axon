@@ -186,10 +186,11 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
         return view
     }
     func settings(for original: Host,
-                  authenticationPrompt: ((ConnectionAuthenticationDraft) throws -> ConnectionAuthenticationResult)? = nil) throws -> SSHClientSettings {
+                  authenticationPrompt: ((ConnectionAuthenticationDraft) throws -> ConnectionAuthenticationResult)? = nil,
+                  draftMaterial: Secrets.Value? = nil, useDraftHost: Bool = false) throws -> SSHClientSettings {
         // Metadata validation still precedes Keychain reads and presentation.
         // Reload saved auth metadata so remembered choices apply on reconnect.
-        let saved = GroupDefaults.connectionSource(original, workspace: store.workspace)
+        let saved = useDraftHost ? original : GroupDefaults.connectionSource(original, workspace: store.workspace)
         let source = try ConnectionValidation.host(saved, workspace: store.workspace, chinese: store.chinese)
         SSHCertificates.registerRSA()
         let authority = try source.hostCertificateAuthorityPath.flatMap { $0.isEmpty ? nil : try SSHCertificates.publicKey($0) }
@@ -205,7 +206,7 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
             return settings
         }
         let secretID = store.groupSecretID(for: saved)
-        let material = Secrets.Value(secret: try Secrets.readChecked(secretID),
+        let material = try draftMaterial ?? Secrets.Value(secret: Secrets.readChecked(secretID),
                                      privateKey: source.auth == "key" && source.keySource == "text" ? try Secrets.readPrivateKey(secretID) : "")
         var draft = ConnectionAuthenticationDraft(host: source, material: material)
         var reusable: ConnectionAuthenticationResult?
