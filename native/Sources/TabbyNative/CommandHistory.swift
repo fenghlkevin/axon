@@ -30,10 +30,29 @@ struct ExecutedCommand: Codable, Identifiable, Equatable {
 enum CommandHistoryProtocol {
     static func decode(_ report: String, token: String) -> String? {
         let prefix = "axon-command;" + token + ";"
-        guard report.hasPrefix(prefix), report.utf8.count <= 16000,
-              let data = Data(base64Encoded: String(report.dropFirst(prefix.count))), data.count <= 8192,
+        guard report.hasPrefix(prefix), report.utf8.count <= 16000 else { return nil }
+        var payload = String(report.dropFirst(prefix.count))
+        if payload.hasPrefix("begin;") {
+            let fields = payload.split(separator: ";", maxSplits: 2)
+            guard fields.count == 3, UInt64(fields[1]) != nil else { return nil }
+            payload = String(fields[2])
+        }
+        guard let data = Data(base64Encoded: payload), data.count <= 8192,
               let command = String(data: data, encoding: .utf8) else { return nil }
         return command
+    }
+    static func sequence(_ payload: String) -> UInt64? {
+        let fields = payload.split(separator: ";")
+        return fields.first == "begin" && fields.count == 3 ? UInt64(fields[1]) : nil
+    }
+    static func completion(_ payload: String) -> (sequence: UInt64?, code: Int, seconds: Double)? {
+        let fields = payload.split(separator: ";")
+        guard fields.first == "end", fields.count == 3 || fields.count == 4 else { return nil }
+        let offset = fields.count == 4 ? 1 : 0
+        guard offset == 0 || UInt64(fields[1]) != nil,
+              let code = Int(fields[1 + offset]), let seconds = Double(fields[2 + offset]),
+              seconds.isFinite, seconds >= 0, seconds <= 31536000 else { return nil }
+        return (offset == 1 ? UInt64(fields[1]) : nil, code, seconds)
     }
     /// Only identify Axon's reserved hook setup, not user commands that mention
     /// the hook (for example grep, cat or printf while troubleshooting).
@@ -124,7 +143,9 @@ enum CommandHistoryProtocol {
     func endCommandHistoryBootstrapScreen() {
         guard commandHistoryBootstrapScreen else { return }
         commandHistoryBootstrapScreen = false
-        terminal?.feed(text: "\u{1b}[?1049l")
+        // The shell redraws PS1 after the bootstrap command. Replace the old
+        // prompt on the restored line rather than appending a second copy.
+        terminal?.feed(text: "\u{1b}[?1049l\r\u{1b}[2K")
         let cover = commandHistoryBootstrapCover
         commandHistoryBootstrapCover = nil
         // Keep the frozen normal screen until the restored buffer has rendered.
@@ -169,19 +190,21 @@ enum CommandHistoryProtocol {
         if payload == "prompt" { aiShellInput.prompt(); return true }
         let history = commandHistoryStore ?? CommandHistoryStore.shared
         if payload.hasPrefix("meta;") {
-            if let id = activeCommandHistoryID, let bytes = Data(base64Encoded: String(payload.dropFirst(5))), bytes.count <= 8192, let path = String(data: bytes, encoding: .utf8), !path.unicodeScalars.contains(where: { $0.value < 32 }) {
-                _ = history.update(id, directory: path)
+            if let bytes = Data(base64Encoded: String(payload.dropFirst(5))), bytes.count <= 8192, let path = String(data: bytes, encoding: .utf8), path.hasPrefix("/"), !path.unicodeScalars.contains(where: { $0.value < 32 }) {
+                updateShellDirectory(path)
+                if let id = activeCommandHistoryID { _ = history.update(id, directory: path) }
             }
             return true
         }
         if payload.hasPrefix("end;") {
-            let fields = payload.split(separator: ";")
-            if fields.count == 3, let code = Int(fields[1]), let seconds = Double(fields[2]), seconds.isFinite, seconds >= 0, seconds <= 31536000, let id = activeCommandHistoryID {
-                if let entry = history.update(id, exitCode: code, duration: seconds), store.workspace.preferences.commandCompletionNotifications, seconds >= 10 { CommandCompletionNotification.send(entry) }
+            guard let end = CommandHistoryProtocol.completion(payload), end.sequence == activeCommandSequence else { return true }
+            if let id = activeCommandHistoryID {
+                if let entry = history.update(id, exitCode: end.code, duration: end.seconds), store.workspace.preferences.commandCompletionNotifications, end.seconds >= 10 { CommandCompletionNotification.send(entry) }
             }
-            if fields.count == 3, let code = Int(fields[1]) { aiShellExitCode = code; aiShellCompletionRevision &+= 1 }
-            activeCommandHistoryID = nil; return true
+            aiShellExitCode = end.code; aiShellCompletionRevision &+= 1
+            activeCommandHistoryID = nil; activeCommandSequence = nil; return true
         }
+        activeCommandSequence = CommandHistoryProtocol.sequence(payload)
         aiShellInput.invalidate()
         let origin = commandOriginTracker.consume()
         guard commandHistoryRecording, let command = CommandHistoryProtocol.decode(report, token: commandHistoryToken), CommandHistoryProtocol.allowed(command) else { activeCommandHistoryID = nil; return true }
@@ -279,7 +302,7 @@ struct OperationHistoryView: View {
             Text(store.text("Records Bash/Zsh commands by server. Axon initialization scripts and password input are excluded.", "自动记录 Bash/Zsh 命令，按服务器查看；不记录 Axon 初始化脚本和密码提示中的输入。" )).font(.system(size: 12)).foregroundStyle(Palette.muted)
             HStack(spacing: 12) {
                 VaultSearchField(placeholder: store.text("Search server or command", "搜索服务器或命令"), text: $search)
-                AxonChoiceField(selection: $originFilter, choices: [("all", store.text("All sources", "全部来源"))] + CommandOrigin.allCases.map { ($0.rawValue, $0.title(chinese: store.chinese)) }, placeholder: store.text("Command source", "命令来源"), symbol: "line.3.horizontal.decrease.circle", identifier: "axon-history-origin-filter").frame(width: 180)
+                AxonChoiceField(selection: $originFilter, choices: [("all", store.text("All sources", "全部来源"))] + [CommandOrigin.ai, .human].map { ($0.rawValue, $0.title(chinese: store.chinese)) }, placeholder: store.text("Command source", "命令来源"), symbol: "line.3.horizontal.decrease.circle", identifier: "axon-history-origin-filter").frame(width: 180)
             }
             if let error = history.error { Text(error).foregroundStyle(.red) }
             ScrollView {

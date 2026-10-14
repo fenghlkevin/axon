@@ -49,7 +49,7 @@ struct ShortcutBinding: Codable, Equatable, Hashable {
     }
     static func validationIssue(_ preferences: Preferences, chinese: Bool) -> String? {
         var seen = Set<Self>()
-        for action in ShortcutAction.allCases {
+        for action in ShortcutAction.allCases where action != .saveSettings {
             let value = preferences.shortcut(action)
             if !value.valid { return chinese ? "请使用有效组合键，并避开系统常用快捷键。" : "Use a valid combination that leaves standard system shortcuts available." }
             if !seen.insert(value).inserted { return chinese ? "快捷键重复，请为每个操作设置不同的组合键。" : "Shortcuts conflict. Choose a different combination for each action." }
@@ -132,7 +132,7 @@ final class ShortcutRecorderButton: PreferencesRectNativeButton {
               window.attachedSheet == nil, NSApp.modalWindow == nil,
               (window.firstResponder as? ShortcutRecorderButton)?.recording != true,
               let store = resolveStore(window), let binding = ShortcutBinding.from(event),
-              let action = ShortcutAction.allCases.first(where: { store.workspace.preferences.shortcut($0) == binding }) else { return false }
+              let action = ShortcutAction.allCases.first(where: { $0 != .saveSettings && store.workspace.preferences.shortcut($0) == binding }) else { return false }
         if event.isARepeat { return true }
         switch action {
         case .fontIncrease, .fontDecrease, .fontReset:

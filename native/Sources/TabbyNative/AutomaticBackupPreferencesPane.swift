@@ -44,12 +44,11 @@ struct AutomaticBackupPreferencesPane: View {
                         .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("axon-auto-s3-object")
                 }
-                Text(store.text("Uses the password and credential option above. Save to apply the selected destinations; disabling both removes the remembered password.", "共用上方的密码和携带凭据选项。保存后按所选目标备份；关闭两个目标并保存会移除记住的密码。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text(store.text("Uses the password and credential option above. Changes apply automatically; disabling both removes the remembered password.", "共用上方的密码和携带凭据选项。有效配置自动保存；关闭两个目标会移除记住的密码。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
                 if settings.isEnabled && !canSave && !coordinator.isRunning {
                     Text(store.text("Enter at least 8 characters in the backup password above to enable automatic backup.", "启用自动备份需在上方填写至少 8 位备份密码。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
                 }
                 HStack(spacing: 10) {
-                    action(store.text("Save backup settings", "保存备份设置"), "axon-auto-save", enabled: canSave, run: save)
                     action(store.text("Back up now", "立即备份"), "axon-auto-run", enabled: canRun) {
                         guard canRun else { return }
                         coordinator.runNow()
@@ -77,10 +76,15 @@ struct AutomaticBackupPreferencesPane: View {
             if let folder = coordinator.report.folder { status(folder, title: store.text("iCloud / folder", "iCloud / 文件夹"), id: "axon-auto-folder-status") }
             if let s3 = coordinator.report.s3 { status(s3, title: "S3", id: "axon-auto-s3-status") }
             if coordinator.report.lastAttemptAt == nil {
-                Text(store.text("No automatic backup has run yet. Save settings, then use Back up now to verify the destinations.", "尚未执行自动备份。保存设置后，可点击“立即备份”检查目标。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
+                Text(store.text("No automatic backup has run yet. Use Back up now to verify the destinations.", "尚未执行自动备份。可点击“立即备份”检查目标。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
             }
             Text(store.text("Folder backup completion means the file was saved locally; macOS handles iCloud upload. Offline or unavailable destinations are reported here, and are tried again at the next launch or with Back up now.", "文件夹备份完成表示文件已在本机保存，iCloud 上传由 macOS 处理。网络或文件夹不可用时，会在这里显示失败，下次启动或点击“立即备份”会再次尝试。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
         }.onAppear { if !loaded { load(); loaded = true } }
+            .onChange(of: settings) { _, _ in autoSave() }
+            .onChange(of: password) { _, _ in autoSave() }
+            .onChange(of: includeSecrets) { _, _ in autoSave() }
+            .onChange(of: coordinator.isRunning) { _, running in if !running { autoSave() } }
+
     }
 
     private func status(_ value: AutomaticBackupTargetStatus, title: String, id: String) -> some View {
@@ -102,7 +106,7 @@ struct AutomaticBackupPreferencesPane: View {
                 if settings.isEnabled { savedPassword = try Secrets.readChecked(settings.passwordID, allowInteraction: false) }
             }
             catch {
-                message = store.text("The saved password is temporarily unavailable. Unlock Keychain, then reopen this page or enter the backup password above before saving.", "暂时无法读取已保存的密码。解锁钥匙串后重新打开此页面，或在上方填写备份密码再保存。")
+                message = store.text("The saved password is temporarily unavailable. Unlock Keychain, then reopen this page or enter the backup password above to apply changes.", "暂时无法读取已保存的密码。解锁钥匙串后重新打开此页面，或在上方填写备份密码以自动应用。")
                 failed = true
             }
         } catch { readable = false; show(error) }
@@ -119,6 +123,12 @@ struct AutomaticBackupPreferencesPane: View {
             settings.folderBookmark = selection.bookmark; settings.folderPath = selection.path
             message = ""; failed = false
         } catch { show(error) }
+    }
+    private func autoSave() {
+        guard loaded, readable else { return }
+        var updated = settings; updated.includeSecrets = includeSecrets
+        guard updated != saved || (updated.isEnabled && password != savedPassword) else { return }
+        save()
     }
     private func save() {
         guard canSave else { return }

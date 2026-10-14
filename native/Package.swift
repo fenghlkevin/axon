@@ -10,7 +10,7 @@ let package = Package(
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0"),
     ],
     targets: [
-        .executableTarget(name: "TabbyNative", dependencies: ["SwiftTerm", "Citadel", "Yams"]),
+        .executableTarget(name: "TabbyNative", dependencies: ["SwiftTerm", "Citadel", "Yams"], resources: [.copy("Resources/AIManual")]),
         .testTarget(name: "TabbyNativeTests", dependencies: ["TabbyNative"]),
     ],
     swiftLanguageModes: [.v5]

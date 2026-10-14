@@ -48,7 +48,7 @@ import SwiftTerm
         for mode in ["approve", "decline", "cancel", "disconnect", "autoDisconnect"] {
             var valid = true, executed = 0, round = 0
             let id = UUID()
-            let ai = AIAssistant(fileURL: URL(fileURLWithPath: "/tmp/axon-no-settings-" + UUID().uuidString), modelResponder: { _, _, _ in round += 1; return round == 1 ? self.action("command", "printf approved") : self.action("report_blocker", "Fixture intentionally has no health endpoint") })
+            let ai = AIAssistant(fileURL: URL(fileURLWithPath: "/tmp/axon-no-settings-" + UUID().uuidString), modelResponder: { _, _, _ in round += 1; return round == 1 ? try p0FixtureReply(self.action("command", "printf approved"), goal: "执行操作") : self.action("report_blocker", "Fixture intentionally has no health endpoint") })
             let executor = AICommandExecutor(sessionID: id, source: "original-target", directory: "/tmp", valid: { valid }, execute: { command, _ in
                 executed += 1; return AICommandResult(output: command == "uname -s; pwd" ? "Darwin\n/tmp" : "approved", exitCode: 0)
             })
@@ -92,12 +92,24 @@ import SwiftTerm
                 instructions=body['system'] if claude else body['messages'][0]['content']
                 assert 'ONE action' in instructions
                 n=counts.get(self.path,0); counts[self.path]=n+1
-                if n: assert 'Actual result' in body['messages'][-1]['content'] and '321' in body['messages'][-1]['content']
-                text='正在查询。\n```axon_action\n'+json.dumps({'tool':'inspect_port','argument':'8080','reason':'查询8080'})+'\n```' if not n else '检查完成：PID 321 正在监听 8080。'
+                if n:
+                    result=body['messages'][-1]['content'][0]['content'] if claude else body['messages'][-1]['content']
+                    assert 'Actual result' in result and '321' in result
+                    call=body['messages'][-2]['content'][0] if claude else body['messages'][-2]['tool_calls'][0]
+                    assert call['id']=='call_0'
+                    assert body['messages'][-1]['content'][0]['tool_use_id']=='call_0' if claude else body['messages'][-1]['tool_call_id']=='call_0'
+                assert body['tools'][0].get('name',body['tools'][0].get('function',{}).get('name'))=='axon_step'
+                action={'tool':'inspect_port','argument':'8080','reason':'查询8080','path':None,'find':None,'replacement':None} if not n else None
+                text=json.dumps({'answer':'正在查询。' if not n else '检查完成：PID 321 正在监听 8080。','action':action,'memory':None,'checks':None})
                 self.send_response(200); self.send_header('Content-Type','text/event-stream'); self.end_headers()
-                for part in [text[:len(text)//2],text[len(text)//2:]]:
-                    event={'type':'content_block_delta','delta':{'type':'text_delta','text':part}} if claude else {'choices':[{'delta':{'content':part}}]}
+                if claude:
+                    self.wfile.write(('data: '+json.dumps({'type':'content_block_start','index':0,'content_block':{'type':'tool_use','id':'call_'+str(n),'name':'axon_step','input':{}}})+'\n\n').encode())
+                for i,part in enumerate([text[:len(text)//2],text[len(text)//2:]]):
+                    event={'type':'content_block_delta','index':0,'delta':{'type':'input_json_delta','partial_json':part}} if claude else {'choices':[{'delta':{'tool_calls':[dict({'index':0,'function':dict({'arguments':part},**({'name':'axon_step'} if i==0 else {}))},**({'id':'call_'+str(n)} if i==0 else {}))]}}]}
                     self.wfile.write(('data: '+json.dumps(event)+'\n\n').encode()); self.wfile.flush(); time.sleep(.15)
+                if claude:
+                    for event in [{'type':'content_block_stop','index':0},{'type':'message_delta','delta':{'stop_reason':'tool_use'}}]: self.wfile.write(('data: '+json.dumps(event)+'\n\n').encode())
+                else: self.wfile.write(('data: '+json.dumps({'choices':[{'delta':{},'finish_reason':'tool_calls'}]})+'\n\n').encode())
                 self.wfile.write(('data: '+(json.dumps({'type':'message_stop'}) if claude else '[DONE]')+'\n\n').encode()); self.wfile.flush()
         server=http.server.HTTPServer(('127.0.0.1',0),Handler)
         open(sys.argv[1],'w').write(str(server.server_port))
@@ -193,13 +205,13 @@ import SwiftTerm
         defer { try? FileManager.default.removeItem(at: root) }
         let store = AppStore(fileURL: root.appendingPathComponent("workspace.json")); store.workspace.preferences.language = "zh-CN"
         let session = TerminalSession(host: nil, store: store); session.connected = true; store.sessions = [session]; store.activeSession = session.id
-        var round = 0, executed = 0
-        let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { _, _, _ in round += 1; return round == 1 ? self.action("command", "printf 'fixture approved'") : round == 2 ? self.action("http_health", "http://owned-fixture:8080/health") : "检查完成，服务正常。" })
+        var round = 0, executed = 0; var roundGoal = "检查服务并修复"
+        let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { _, _, _ in round += 1; return round == 1 ? try p0FixtureReply(self.action("command", "printf 'fixture approved'"), goal: roundGoal, tool: "http_health", argument: "http://owned-fixture:8080/health", expected: "healthy") : round == 2 ? self.action("http_health", "http://owned-fixture:8080/health") : "检查完成，服务正常。" })
         ai.prepare(source: "fixture-long-production-host", text: "ERROR test", sessionID: session.id, question: "检查服务并修复")
         let executor = AICommandExecutor(sessionID: session.id, source: "fixture-user@long-production-host.example:22", directory: "/srv/fixture project", valid: { true }, execute: { command, update in
             executed += 1
             if command != "uname -s; pwd" { update("Checking fixture service…"); try await Task.sleep(for: .milliseconds(350)) }
-            return AICommandResult(output: command == "uname -s; pwd" ? "Linux\n/srv/fixture project" : "fixture approved", exitCode: 0)
+            return AICommandResult(output: command == "uname -s; pwd" ? "Linux\n/srv/fixture project" : "HTTP/1.1 200 OK\nhealthy\nAXON_HTTP_STATUS:200\n", exitCode: 0)
         })
         store.ai = ai
         let terminalView = TerminalView(frame: NSRect(x:0,y:0,width:600,height:760)); terminalView.feed(text: "service example-java\r\nERROR upstream connection refused\r\n"); session.terminal = terminalView
@@ -210,7 +222,7 @@ import SwiftTerm
             let host = NSHostingView(rootView: HStack(spacing: 0) { AgentPreviewTerminal(view: terminalView); TerminalToolsPanel(selection: .constant("ai"), isVisible: .constant(true), availableHeight: 760, panelWidth: panelWidth) }.environmentObject(store).frame(width: CGFloat(width), height: 760))
             let window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: width,height: 760),styleMask: [.titled],backing:.buffered,defer:false); window.isReleasedWhenClosed = false; window.contentView = host; window.orderFront(nil)
             try await Task.sleep(for: .milliseconds(100)); host.layoutSubtreeIfNeeded(); try snapshot(host, "\(output)/empty-\(width).png")
-            round = 0; ai.send(executor: executor); try await wait { ai.pendingApproval != nil }
+            round = 0; roundGoal = ai.question; ai.send(executor: executor); try await wait { ai.pendingApproval != nil }
             try await Task.sleep(for: .milliseconds(100)); host.layoutSubtreeIfNeeded(); try snapshot(host, "\(output)/approval-\(width).png")
             let approve = try XCTUnwrap(accessible(host).first { read($0,"accessibilityIdentifier") as? String == "axon-ai-approve" })
             let selector = NSSelectorFromString("accessibilityPerformPress"); typealias Press = @convention(c) (AnyObject, Selector) -> Bool

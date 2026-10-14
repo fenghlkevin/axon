@@ -18,7 +18,7 @@ for obsolete_icon in "$app/Contents/Resources"/AppIcon-*.icns(N); do
     rm -f "$obsolete_icon"
 done
 # A versioned icon resource lets LaunchServices distinguish the updated artwork.
-cp "$project_root/Branding/AppIcon.icns" "$app/Contents/Resources/AppIcon-152.icns"
+cp "$project_root/Branding/AppIcon.icns" "$app/Contents/Resources/AppIcon-190.icns"
 for resource in "$products"/*.bundle(N); do
     ditto "$resource" "$app/Contents/Resources/${resource:t}"
 done
@@ -31,10 +31,12 @@ cat > "$app/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>Axon</string>
 <key>CFBundleDisplayName</key><string>Axon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.17.2</string>
-<key>CFBundleVersion</key><string>152</string>
-<key>CFBundleIconFile</key><string>AppIcon-152</string>
+<key>CFBundleShortVersionString</key><string>0.19.25</string>
+<key>CFBundleVersion</key><string>190</string>
+<key>CFBundleIconFile</key><string>AppIcon-190</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
+<key>NSMicrophoneUsageDescription</key><string>Axon uses the microphone only when you start voice input to dictate a draft.</string>
+<key>NSSpeechRecognitionUsageDescription</key><string>Axon transcribes voice input into an editable draft on this Mac.</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>CFBundleDevelopmentRegion</key><string>en</string>
 <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string></array>
@@ -52,6 +54,6 @@ fi
 codesign --force --deep --sign "$signing_identity" "$app"
 codesign --verify --deep --strict "$app"
 if [[ "$configuration" == release ]]; then
-    ditto -c -k --sequesterRsrc --keepParent "$app" "$project_root/dist/Axon-0.17.2-mac-arm64.zip"
+    ditto -c -k --sequesterRsrc --keepParent "$app" "$project_root/dist/Axon-0.19.25-mac-arm64.zip"
 fi
 print "$app"

@@ -281,7 +281,34 @@ enum Secrets {
 }
 
 @MainActor final class AppStore: ObservableObject {
-    lazy var ai = AIAssistant(fileURL: fileURL.deletingLastPathComponent().appendingPathComponent("ai-settings.json"))
+    @Published var aiSessions: [AIAssistant] = []
+    @Published private var selectedAssistant: AIAssistant?
+    private var aiStorageRoot: URL { aiNamespace.map { fileURL.deletingLastPathComponent().appendingPathComponent("AISceneSessions/" + $0.uuidString) } ?? fileURL.deletingLastPathComponent() }
+    var aiPrimaryJournalURL: URL? { aiNamespace == nil ? nil : aiStorageRoot.appendingPathComponent("primary.json") }
+    var aiConversationDirectory: URL { aiStorageRoot.appendingPathComponent("AISessions") }
+    lazy var aiNotifications = AINotifications(root: aiStorageRoot)
+    var ai: AIAssistant {
+        get {
+            if let selectedAssistant { return selectedAssistant }
+            let initial = AIAssistant(fileURL: fileURL.deletingLastPathComponent().appendingPathComponent("ai-settings.json"), sessionJournalURL: aiPrimaryJournalURL)
+            registerAI(initial); selectedAssistant = initial
+            let directory = aiConversationDirectory
+            for path in ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []).filter({ $0.pathExtension == "json" && UUID(uuidString: $0.deletingPathExtension().lastPathComponent) != nil }).sorted(by: {
+                let left = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                let right = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+                return left == right ? $0.lastPathComponent < $1.lastPathComponent : left > right
+            }).prefix(19) {
+                let restored = AIAssistant(fileURL: fileURL.deletingLastPathComponent().appendingPathComponent("ai-settings.json"), sessionJournalURL: path)
+                if let entry = restored.taskRecords.last {
+                    restored.prepare(source: entry.target, text: "", sessionID: entry.executed == false ? nil : entry.sessionID, question: "")
+                    restored.restoreTask(entry)
+                }
+                if !restored.taskRecords.isEmpty { registerAI(restored) }
+            }
+            return initial
+        }
+        set { registerAI(newValue); selectedAssistant = newValue }
+    }
     @Published var aiAnalysisPresented = false
     @Published var aiTerminalRequest = UUID()
     let monitoring = MonitoringCenter()
@@ -319,6 +346,7 @@ enum Secrets {
     var sharedWorkspaceCommit: ((Workspace) -> Bool)?
     weak var sceneWindowOwner: AppStore?
     var sceneWindowID: UUID?
+    private let aiNamespace: UUID?
     let fileURL: URL
     var applicationIconController = ApplicationIconController.production()
     @Published var forwardStatus: [UUID: String] = [:]
@@ -326,8 +354,10 @@ enum Secrets {
     var forwardEngines: [UUID: LocalForwardEngine] = [:]
     private var loadFailed = false
     var canAutomaticallyBackup: Bool { !loadFailed }
-    init(fileURL: URL? = nil) {
+    init(fileURL: URL? = nil, aiNamespace: UUID? = nil) {
+        self.aiNamespace = aiNamespace
         self.fileURL = fileURL ?? ProcessInfo.processInfo.environment["TABBY_NATIVE_WORKSPACE"].map { URL(fileURLWithPath: $0) } ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("TabbyNative/workspace.json")
+        _ = ai
         if FileManager.default.fileExists(atPath: self.fileURL.path) {
             do {
                 workspace = try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: self.fileURL))

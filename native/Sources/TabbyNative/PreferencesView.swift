@@ -40,7 +40,6 @@ struct PreferencesView: View {
     @State private var timeoutValid = true
     @State private var historyValid = true
     @State private var error = ""
-    @State private var saved = false
     @State private var loaded = false
     @State private var draftRevision = 0
     @State private var colorCommitSnapshot: Preferences?
@@ -71,10 +70,11 @@ struct PreferencesView: View {
             Rectangle().fill(Palette.border).frame(height: 1)
             HStack(spacing: 12) {
                 if !error.isEmpty { Text(error).foregroundStyle(.red).font(.system(size: 11)).fixedSize(horizontal: false, vertical: true) }
-                else { Text(saved && !dirty ? store.text("Settings saved", "设置已保存") : dirty ? store.text("Unsaved changes", "有未保存的更改") : store.text("Changes apply after saving", "保存后生效")).font(.system(size: 11)).foregroundStyle(Palette.muted) }
+                else { Text(!validNumbers ? store.text("Enter a valid value to apply changes", "请输入有效值后自动应用") : store.text("Changes apply automatically", "修改后自动保存并生效")).font(.system(size: 11)).foregroundStyle(Palette.muted) }
                 Spacer(minLength: 8)
-                Button(store.text("Revert", "撤销更改"), action: reload).buttonStyle(ChromeButtonStyle()).disabled(!dirty).accessibilityIdentifier("axon-preferences-revert")
-                Button(store.text("Save", "保存"), action: save).buttonStyle(ChromeButtonStyle(prominent: true)).disabled(!dirty || !validNumbers || ShortcutBinding.validationIssue(draft, chinese: store.chinese) != nil).keyboardShortcut(store.workspace.preferences.shortcut(.saveSettings).keyEquivalent, modifiers: store.workspace.preferences.shortcut(.saveSettings).modifiers).accessibilityIdentifier("axon-preferences-save")
+                if !error.isEmpty {
+                    Button(store.text("Retry", "重试"), action: save).buttonStyle(ChromeButtonStyle())
+                }
             }.padding(.horizontal, 20).padding(.vertical, 14).background(Palette.sidebar)
             }
         }.foregroundStyle(Palette.text).font(.system(size: 13)).frame(minWidth: 650, minHeight: 520)
@@ -82,10 +82,11 @@ struct PreferencesView: View {
             .onReceive(NotificationCenter.default.publisher(for: .axonSaveSettingsShortcut)) { notification in
                 if notification.object as? AppStore === store, dirty, validNumbers, ShortcutBinding.validationIssue(draft, chinese: store.chinese) == nil { save() }
             }
-            .onChange(of: draft) { _, _ in saved = false; error = "" }
+            .onChange(of: draft) { _, _ in applyAutomatically() }
+            .onChange(of: validNumbers) { _, valid in if valid { applyAutomatically() } }
             .onChange(of: store.workspace.preferences) { _, value in
-                if colorCommitSnapshot == value { colorCommitSnapshot = nil }
-                else { reload() }
+                if colorCommitSnapshot == value || (try? PreferencesValidation.validated(draft, chinese: store.chinese)) == value { colorCommitSnapshot = nil }
+                else if error.isEmpty { reload() }
             }
     }
     private var sidebar: some View {
@@ -134,7 +135,7 @@ struct PreferencesView: View {
                 row(store.text("Language", "语言")) { AxonChoiceField(selection: $draft.language, choices: [("auto", store.text("Automatic", "自动")), ("zh-CN", "简体中文"), ("en-US", "English")], placeholder: store.text("Language", "语言"), symbol: "globe", identifier: "axon-language") }
                 Text(store.text("Application icon", "程序图标")).foregroundStyle(Palette.muted)
                 ApplicationIconPicker(selection: $draft.applicationIcon, chinese: store.chinese)
-                note(store.text("Both icons keep the yellow node. Save to apply the selected application icon and logo.", "两款均保留黄色节点；保存后应用于程序图标与应用 Logo。"))
+                note(store.text("Both icons keep the yellow node. The selected application icon and logo apply automatically.", "两款均保留黄色节点；选择后自动应用于程序图标与应用 Logo。"))
             }
             section(store.text("Local terminal", "本地终端")) {
                 pathField(store.text("Shell executable", "Shell 程序"), text: $draft.localShell, placeholder: store.text("System default", "使用系统默认"), directory: false)
@@ -174,7 +175,7 @@ struct PreferencesView: View {
                 Toggle(store.text("Middle click to paste", "中键粘贴"), isOn: $draft.middleClickPaste).toggleStyle(AxonCheckboxStyle())
                 Toggle(store.text("Trim pasted whitespace", "去除粘贴首尾空白"), isOn: $draft.trimPaste).toggleStyle(AxonCheckboxStyle())
                 Toggle(store.text("Confirm multiline paste", "粘贴多行内容前确认"), isOn: $draft.confirmMultilinePaste).toggleStyle(AxonCheckboxStyle())
-                note(store.text("Applies to open terminals after saving. Multiline confirmation shows a preview before sending text.", "保存后应用到已打开终端；多行粘贴会在发送前展示内容预览。"))
+                note(store.text("Applies to open terminals immediately. Multiline confirmation shows a preview before sending text.", "修改后立即应用到已打开终端；多行粘贴会在发送前展示内容预览。"))
             }
         }
     }
@@ -197,8 +198,8 @@ struct PreferencesView: View {
     }
     private var shortcuts: some View {
         section(store.text("Keyboard shortcuts", "快捷键")) {
-            note(store.text("Click a shortcut, then press a combination containing Command. Escape cancels recording. Save to apply.", "点击快捷键按钮后，按下包含 Command 的组合键；Escape 取消录入，保存后生效。"))
-            ForEach(ShortcutAction.allCases) { action in
+            note(store.text("Click a shortcut, then press a combination containing Command. Escape cancels recording. Valid combinations apply automatically.", "点击快捷键按钮后，按下包含 Command 的组合键；Escape 取消录入，有效组合键自动生效。"))
+            ForEach(ShortcutAction.allCases.filter { $0 != .saveSettings }) { action in
                 HStack(spacing: 16) {
                     Text(action.title(chinese: store.chinese))
                     Spacer(minLength: 8)
@@ -229,16 +230,27 @@ struct PreferencesView: View {
             }
         }
     }
-    private func reload() { draft = store.workspace.preferences; fontSizeInput = TerminalFontSizeNativeEditor.display(draft.fontSize); scrollbackValid = true; fontSizeValid = true; timeoutValid = true; historyValid = true; error = ""; saved = false; draftRevision += 1 }
+    private func reload() { draft = store.workspace.preferences; fontSizeInput = TerminalFontSizeNativeEditor.display(draft.fontSize); scrollbackValid = true; fontSizeValid = true; timeoutValid = true; historyValid = true; error = ""; draftRevision += 1 }
     private func saveTerminalColors(_ value: Preferences) throws {
         try store.commitTerminalColors(value)
         colorCommitSnapshot = store.workspace.preferences
         draft = draft.replacingTerminalColors(from: store.workspace.preferences)
         error = ""
     }
+    private func applyAutomatically() {
+        guard loaded else { return }
+        guard dirty else { error = ""; return }
+        save()
+    }
     private func save() {
         guard validNumbers else { return }
-        do { try store.commitPreferences(draft); draft = store.workspace.preferences; saved = true; error = "" }
+        do {
+            let value = try PreferencesValidation.validated(draft, chinese: store.chinese)
+            guard value != store.workspace.preferences else { error = ""; return }
+            colorCommitSnapshot = value
+            try store.commitPreferences(value)
+            error = ""
+        }
         catch { self.error = error.localizedDescription }
     }
 }

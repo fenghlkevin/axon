@@ -355,6 +355,7 @@ func validateLocalTransfer(_ entry: FileEntry, to destination: String, source: a
     private var generation = 0
     @Published private(set) var opening = false
     private var handledRecentFileRequest: UUID?
+    private var handlingTerminalFileRequest = false
     private var initializedSceneLocations = false
     private var initialSceneLocalDirectory: String?
     private var initialSceneRemoteDirectory: WorkSceneLocation?
@@ -396,6 +397,7 @@ func validateLocalTransfer(_ entry: FileEntry, to destination: String, source: a
     func dismissHostPicker() { if remote != nil { showingHostPicker = false; status = "" } }
 
     func open() async {
+        guard !handlingTerminalFileRequest else { return }
         prepareInitialSceneLocations()
         if session.store.terminalFileRequest?.sessionID == session.id {
             initialSceneLocalDirectory = nil; initialSceneRemoteDirectory = nil
@@ -444,6 +446,8 @@ func validateLocalTransfer(_ entry: FileEntry, to destination: String, source: a
         guard store.section == "sftp" || (store.section == "scene" && store.currentScene?.mode == "files"),
               let request = store.terminalFileRequest,
               request.sessionID == session.id, request.id != store.handledTerminalFileRequestID else { return false }
+        handlingTerminalFileRequest = true
+        defer { handlingTerminalFileRequest = false }
         store.handledTerminalFileRequestID = request.id
         guard canSwitchRight else {
             remote?.error = store.text("Finish the current file operation first.", "请先完成当前文件操作。"); return true

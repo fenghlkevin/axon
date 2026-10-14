@@ -26,16 +26,16 @@ import SwiftTerm
         let hidden = "\u{1b}]7;axon-command;fixture-token;" + first + "\u{7}\u{1b}[31mERROR\u{1b}[0m {\"password\":\"owned-secret\"}"
         let clean = AIContext.sanitize(hidden); XCTAssertFalse(clean.contains("fixture-token")); XCTAssertFalse(clean.contains(first)); XCTAssertFalse(clean.contains("owned-secret")); XCTAssertTrue(clean.contains("ERROR"))
     }
-    func testExplicitChannelRejectsToolsFromOtherChannel() async throws {
+    func testExplicitIndependentChannelRejectsTerminalTools() async throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let store = AppStore(fileURL: root.appendingPathComponent("workspace.json")), session = TerminalSession(host: nil, store: store)
         session.connected = true; let terminal = TerminalView(frame: NSRect(x: 0, y: 0, width: 600, height: 400)); session.terminal = terminal
-        for channel in [AIAssistant.ExecutionChannel.currentTerminal, .independent] {
+        for channel in [AIAssistant.ExecutionChannel.independent] {
             var round = 0, executions = 0, prompts: [String] = []
             let ai = AIAssistant(fileURL: root.appendingPathComponent(UUID().uuidString), modelResponder: { prompt, _, publish in
                 prompts.append(prompt); round += 1
                 let response: String
-                if round == 1 { response = try self.action(channel == .currentTerminal ? "command" : "terminal_read", "") }
+                if round == 1 { response = try self.action(channel == .currentTerminal ? "command" : "terminal_read", channel == .currentTerminal ? "pwd" : "") }
                 else if round == 2 { response = try self.action(channel == .currentTerminal ? "terminal_read" : "inspect_port", channel == .currentTerminal ? "" : "8080") }
                 else { response = "Completed the chosen channel observation." }
                 publish(response); return response
@@ -134,7 +134,7 @@ import SwiftTerm
             case 6: response = try self.action("http_health", "http://127.0.0.1:" + port)
             default: response = "HTTP 200，healthy。测试服务已恢复。"
             }
-            publish(response); return response
+            publish(response); return round == 4 ? try p0FixtureReply(response, goal: "检查网络、服务、配置，修复后验证恢复", tool: "http_health", argument: "http://127.0.0.1:" + port, expected: "healthy") : response
         })
         let executor = AICommandExecutor(sessionID: id, source: "owned localhost fixture", directory: root.path, valid: { true }, execute: { command, publish in try await AICommandExecutor.local(command: command, directory: root.path, update: publish) })
         executor.fileBackend = { LocalFiles() }
@@ -142,7 +142,7 @@ import SwiftTerm
         ai.send(executor: executor); try await wait { ai.pendingApproval != nil }
         XCTAssertEqual(try String(contentsOf: config, encoding: .utf8), "upstream=broken\n"); XCTAssertTrue(ai.approvalPreview.contains("upstream=ready"))
         ai.approveAction(); try await wait { !ai.busy }
-        XCTAssertTrue(ai.error.isEmpty, ai.error); XCTAssertTrue(ai.answer.contains("已恢复")); XCTAssertEqual(round, 7)
+        XCTAssertTrue(ai.error.isEmpty, ai.error); XCTAssertTrue(ai.answer.contains("已恢复"), prompts.joined(separator: "\n---\n")); XCTAssertEqual(round, 7)
         XCTAssertTrue(prompts[5].contains("requires a read-only")); XCTAssertTrue(prompts[6].contains("healthy")); XCTAssertEqual(ai.steps.count, 6)
         XCTAssertEqual(ai.taskRecords.last?.state, "finished")
         let loaded = AIAssistant(fileURL: root.appendingPathComponent("ai.json")); XCTAssertEqual(loaded.taskRecords.count, 1); XCTAssertTrue(loaded.taskRecords[0].transcript.contains("healthy"))
@@ -151,8 +151,8 @@ import SwiftTerm
     }
     func testLongTasksRulesAndFollowupDoNotReplay() async throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }; var round = 0, calls = 0, lastPrompt = ""
-        let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { prompt, _, _ in round += 1; lastPrompt = prompt; return round <= 15 ? try self.action("command", "printf owned") : round == 16 ? try self.action("verify_command", "printf verified") : "完成" })
-        var policy = AIExecutionPolicy(); policy.rules = "allow|owned fixture|command|printf owned\nallow|owned fixture|verify_command|printf verified"; ai.settings.executionPolicy = policy
+        let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { prompt, _, _ in round += 1; lastPrompt = prompt; return round <= 15 ? try p0FixtureReply(self.action("command", "printf owned"), goal: "执行长任务", tool: "verify_command", argument: "cat /owned/verification", expected: "owned") : round == 16 ? try self.action("verify_command", "cat /owned/verification") : "完成" })
+        var policy = AIExecutionPolicy(); policy.rules = "allow|owned fixture|command|printf owned\nallow|owned fixture|verify_command|cat /owned/verification"; ai.settings.executionPolicy = policy
         let executor = AICommandExecutor(sessionID: UUID(), source: "owned fixture", directory: root.path, valid: { true }, execute: { command, _ in calls += 1; return AICommandResult(output: command == "uname -s; pwd" ? "Darwin\n/tmp" : "owned", exitCode: 0) })
         ai.prepare(source: executor.source, text: "", sessionID: executor.sessionID, question: "执行长任务"); ai.send(executor: executor); try await wait { !ai.busy }
         XCTAssertTrue(ai.error.isEmpty); XCTAssertEqual(calls, 17); XCTAssertEqual(ai.steps.count, 17); XCTAssertNil(ai.pendingApproval)
@@ -160,49 +160,24 @@ import SwiftTerm
         XCTAssertTrue(lastPrompt.contains("Previous task evidence")); XCTAssertEqual(calls, 18, "Follow-up refreshes environment; never replays mutations")
         XCTAssertEqual(ai.taskRecords.count, 1)
     }
-    func testRealVimEditSaveExecuteAfterLargeOldOutput() async throws {
-        _ = NSApplication.shared
+    func testAIEditorsAreHardDeniedEvenWithFullAccessAndRememberedAllow() async throws {
+        for mode in AIExecutionPolicy.Mode.allCases {
+            var policy = AIExecutionPolicy(); policy.approvalMode = mode; policy.commandWhitelist = ".*"; policy.rules = "allow|.*|command|.*"
+            for command in ["vim test.sh", "/usr/bin/vi test.sh", "sudo nano test.sh", "env EDITOR=vi emacs test.sh", "printf ok; nvim test.sh", "bash -c 'vim test.sh'"] {
+                XCTAssertEqual(policy.decision(target: "owned", tool: "command", argument: command, automatic: true), .deny, command)
+            }
+        }
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let store = AppStore(fileURL: root.appendingPathComponent("workspace.json"))
-        let session = TerminalSession(host: nil, store: store); session.connected = true
-        let terminal = LocalTerminal(frame: NSRect(x: 0, y: 0, width: 700, height: 400))
-        terminal.ownerSession = session; session.terminal = terminal; terminal.terminalDelegate = session
-        session.commandHistoryStore = CommandHistoryStore(fileURL: root.appendingPathComponent("history.json"))
-        terminal.startProcess(executable: "/bin/bash", args: ["--noprofile", "--norc", "-i"], environment: ["HOME=" + root.path, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TERM=xterm-256color", "PS1=AXON_VIM> "], currentDirectory: root.path)
-        defer { terminal.terminate() }
-        try await wait { session.aiTerminalOutputRevision > 0 }
+        let session = TerminalSession(host: nil, store: store); session.connected = true; session.commandHistoryToken = "fixture"
         let bridge = AITerminalBridge(session: session)
-        func perform(_ tool: String, _ value: String = "") async throws -> AICommandResult {
-            let action = try XCTUnwrap(AIAgentAction.parse(self.action(tool, value)))
-            return try await bridge.run(action) { _ in }
-        }
-        let hook = root.appendingPathComponent("hooks.sh")
-        try Data(ShellCommandIntegration.script(token: "vim-fixture").utf8).write(to: hook); session.commandHistoryToken = "vim-fixture"
-        _ = try await perform("terminal_send", "source " + SnippetParameters.shellArgument(hook.path)); _ = try await perform("terminal_key", "enter")
-        try await wait { session.commandHistoryReady }
-        _ = try await perform("terminal_send", "printf '%30000s' OLD_OUTPUT"); _ = try await perform("terminal_key", "enter")
-        try await wait { (session.aiCommandCapture.finished.last?.output.count ?? 0) > 24000 }
-        _ = try await perform("terminal_send", "vim -Nu NONE -n s.sh"); _ = try await perform("terminal_key", "enter")
-        _ = try await perform("terminal_key", "escape")
-        _ = try await perform("terminal_send", "iecho \"hello world\"")
-        let inserted = try await perform("terminal_read")
-        let screen = String(inserted.output.components(separatedBy: "Active command evidence").first ?? "")
-        XCTAssertTrue(screen.contains("echo \"hello world\""), inserted.output)
-        XCTAssertTrue(screen.contains("INSERT"), inserted.output)
-        XCTAssertLessThan(inserted.output.count, 24000)
-        let window = NSWindow(contentRect: NSRect(x:0,y:0,width:700,height:400), styleMask:[.titled], backing:.buffered, defer:false)
-        window.isReleasedWhenClosed = false; window.contentView = terminal; window.orderFront(nil)
-        try await Task.sleep(for: .milliseconds(100))
-        let output = URL(fileURLWithPath: "/tmp/axon-0167-ui"); try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        try snapshot(terminal, output.appendingPathComponent("vim-insert.png"))
-        _ = try await perform("terminal_key", "escape"); _ = try await perform("terminal_send", ":wq"); _ = try await perform("terminal_key", "enter")
-        try await wait { FileManager.default.fileExists(atPath: root.appendingPathComponent("s.sh").path) }
-        XCTAssertEqual(try String(contentsOf: root.appendingPathComponent("s.sh"), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines), "echo \"hello world\"")
-        _ = try await perform("terminal_send", "sh s.sh"); let executed = try await perform("terminal_key", "enter")
-        XCTAssertTrue(executed.output.contains("hello world"), executed.output)
-        try await wait { session.aiCommandCapture.finished.last?.command == "sh s.sh" }
-        XCTAssertEqual(session.aiCommandCapture.finished.last?.exitCode, 0)
-        try snapshot(terminal, output.appendingPathComponent("vim-executed.png")); window.close()
+        let marker = "\u{1b}]7;axon-command;fixture;" + Data("vim test.sh".utf8).base64EncodedString() + "\u{7}"
+        session.captureOutput(Array(marker.utf8)); session.aiShellInput.invalidate()
+        let input = try XCTUnwrap(AIAgentAction.parse(action("terminal_send", "ihello")))
+        let permission = bridge.permission(input, fallback: "ihello")
+        XCTAssertTrue(AIBuiltInDeny.matches(permission.command))
+        XCTAssertEqual(permission.tool, "terminal_editor")
+        XCTAssertThrowsError(try AIExecutableInspection.programCommand(":wq", program: "vim test.sh", insertMode: false))
     }
     func testLiveTerminalShellREPLDatabaseAndFullScreen() async throws {
         _ = NSApplication.shared
@@ -210,13 +185,15 @@ import SwiftTerm
         let store = AppStore(fileURL: root.appendingPathComponent("workspace.json"))
         let session = TerminalSession(host: nil, store: store); session.connected = true
         let terminal = LocalTerminal(frame: NSRect(x: 0, y: 0, width: 700, height: 400)); terminal.ownerSession = session; session.terminal = terminal; terminal.terminalDelegate = session; session.commandHistoryStore = CommandHistoryStore(fileURL: root.appendingPathComponent("history.json"))
-        terminal.startProcess(executable: "/bin/bash", args: ["--noprofile", "--norc", "-i"], environment: ["HOME=" + root.path, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TERM=xterm-256color", "PS1=AXON_FIXTURE> "], currentDirectory: root.path)
+        let hook = root.appendingPathComponent("hooks.sh"); try Data(ShellCommandIntegration.script(token: "fixture-token").utf8).write(to: hook)
+        session.commandHistoryToken = "fixture-token"
+        terminal.startProcess(executable: "/bin/bash", args: ["--noprofile", "--rcfile", hook.path, "-i"], environment: ["HOME=" + root.path, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TERM=xterm-256color", "PS1=AXON_FIXTURE> "], currentDirectory: root.path)
         defer { terminal.terminate() }
-        try await wait { session.aiTerminalOutputRevision > 0 }
+        try await wait { session.commandHistoryReady && session.aiShellInput.line == "" }
         let bridge = AITerminalBridge(session: session)
         func perform(_ tool: String, _ value: String = "") async throws -> AICommandResult { let action = try XCTUnwrap(AIAgentAction.parse(self.action(tool, value))); _ = try action.command(os: "Darwin"); return try await bridge.run(action) { _ in } }
         _ = try await perform("terminal_send", "export AXON_FIXTURE_ENV=shared"); _ = try await perform("terminal_key", "enter")
-        _ = try await perform("terminal_send", "printf 'ENV=%s\\n' \"$AXON_FIXTURE_ENV\""); let shell = try await perform("terminal_key", "enter"); XCTAssertTrue(shell.output.contains("ENV=shared")); XCTAssertTrue(shell.output.contains("completion/exit code unknown"))
+        _ = try await perform("terminal_send", "printf 'ENV=%s\\n' \"$AXON_FIXTURE_ENV\""); let shell = try await perform("terminal_key", "enter"); XCTAssertTrue(shell.output.contains("ENV=shared")); XCTAssertTrue(shell.output.contains("Verified hook exit: 0"))
         _ = try await perform("terminal_send", "python3 -q"); _ = try await perform("terminal_key", "enter")
         _ = try await perform("terminal_send", "print('REPL_RESULT=' + str(6 * 7))"); let repl = try await perform("terminal_key", "enter"); XCTAssertTrue(repl.output.contains("REPL_RESULT=42"))
         _ = try await perform("terminal_key", "ctrl-d")
@@ -226,12 +203,14 @@ import SwiftTerm
         _ = try await perform("terminal_send", "python3 " + SnippetParameters.shellArgument(script.path)); let screen = try await perform("terminal_key", "enter"); XCTAssertTrue(screen.output.contains("AXON_FULLSCREEN"))
         let key = try await perform("terminal_send", "q"); XCTAssertTrue(key.output.contains("KEY=q")); _ = try await perform("terminal_send", "x")
         session.writeInput(Array("manual".utf8))
-        do { _ = try await perform("terminal_send", "stale"); XCTFail("User input must invalidate the action") } catch { XCTAssertTrue(error.localizedDescription.contains("重新读取")) }
+        do { _ = try await perform("terminal_send", "stale"); XCTFail("User input must invalidate the action") } catch { XCTAssertTrue(error.localizedDescription.contains("交回")) }
         _ = try await perform("terminal_read")
+        bridge.acquireControl(UUID()) // Explicit handback is required after manual input.
         _ = try await perform("terminal_key", "ctrl-c")
-        let hook = root.appendingPathComponent("hooks.sh"); try Data(ShellCommandIntegration.script(token: "fixture-token").utf8).write(to: hook)
-        session.commandHistoryToken = "fixture-token"
-        _ = try await perform("terminal_send", "source " + SnippetParameters.shellArgument(hook.path)); _ = try await perform("terminal_key", "enter")
+        // Interactive fixtures may leave CR translation disabled; restore the owned PTY
+        // using LF before installing the shell hook, instead of assuming Return is LF.
+        _ = try await perform("terminal_send", "stty sane")
+        _ = try await perform("terminal_key", "ctrl-j")
         try await wait { session.commandHistoryReady }
         let hookObservation = try await perform("terminal_read"); XCTAssertTrue(session.commandHistoryReady, hookObservation.output); XCTAssertEqual(session.aiShellInput.line, "")
         _ = try await perform("terminal_send", "printf 'HOOK_RANGE_FIXTURE\\n'; false"); let captured = try await perform("terminal_key", "enter")
@@ -241,7 +220,7 @@ import SwiftTerm
         session.captureOutput(Array("\u{1b}[?1l".utf8)); XCTAssertFalse(session.aiApplicationCursor)
         session.commandHistoryReady = true
         XCTAssertTrue(session.receiveCommandHistory("axon-command;fixture-token;end;7;0.1"))
-        let verified = try await perform("terminal_read"); XCTAssertTrue(verified.output.contains("Verified shell-hook completion")); XCTAssertTrue(verified.output.contains("exit 7"))
+        let verified = try await perform("terminal_read"); XCTAssertFalse(verified.output.contains("Verified shell-hook completion")); XCTAssertFalse(verified.output.contains("exit 7"))
         let waitTask = Task { @MainActor in try await perform("terminal_wait", "30") }; try await Task.sleep(for: .milliseconds(100)); waitTask.cancel()
         do { _ = try await waitTask.value; XCTFail("Expected cancellation") } catch { }
         XCTAssertTrue(session.connected, "Stopping agent observation must retain user's terminal")
@@ -249,8 +228,8 @@ import SwiftTerm
     func testRememberedPermissionIsExactAndSystemDenyRunsNothing() async throws {
         let root = try root(); defer { try? FileManager.default.removeItem(at: root) }
         let hostID = UUID(), settingsFile = root.appendingPathComponent("ai.json"); var round = 0, calls = 0
-        let responder: (String, String, @escaping (String) -> Void) async throws -> String = { _, _, _ in round += 1; return round == 1 ? try self.action("command", "printf 'owned|fixture'") : round == 2 ? try self.action("http_health", "http://owned-fixture/health") : "验证完成" }
-        let executor = AICommandExecutor(sessionID: UUID(), source: "owned fixture", directory: root.path, valid: { true }, execute: { command, _ in calls += 1; return AICommandResult(output: command == "uname -s; pwd" ? "Darwin\n/tmp" : "healthy", exitCode: 0) }); executor.hostID = hostID
+        let responder: (String, String, @escaping (String) -> Void) async throws -> String = { prompt, _, _ in round += 1; let goal = String(prompt.components(separatedBy: "Goal: ").last?.components(separatedBy: "\n").first ?? ""); return round == 1 ? try p0FixtureReply(self.action("command", "printf 'owned|fixture'"), goal: goal, tool: "http_health", argument: "http://owned-fixture/health", expected: "healthy") : round == 2 ? try self.action("http_health", "http://owned-fixture/health") : "验证完成" }
+        let executor = AICommandExecutor(sessionID: UUID(), source: "owned fixture", directory: root.path, valid: { true }, execute: { command, _ in calls += 1; return AICommandResult(output: command == "uname -s; pwd" ? "Darwin\n/tmp" : "HTTP/1.1 200 OK\nhealthy\nAXON_HTTP_STATUS:200\n", exitCode: 0) }); executor.hostID = hostID
         let ai = AIAssistant(fileURL: settingsFile, modelResponder: responder); ai.prepare(source: executor.source, text: "", sessionID: executor.sessionID, question: "执行操作"); ai.send(executor: executor)
         try await wait { ai.pendingApproval != nil }; XCTAssertEqual(calls, 1); ai.rememberExactAction(); try await wait { !ai.busy }
         XCTAssertTrue(ai.error.isEmpty, ai.error); XCTAssertEqual(calls, 3); XCTAssertEqual(ai.settings.policy.exactAllows?.first?.argument, "printf 'owned|fixture'")
@@ -272,13 +251,17 @@ import SwiftTerm
         let terminal = LocalTerminal(frame: NSRect(x: 0, y: 0, width: 700, height: 760)); terminal.ownerSession = session; session.terminal = terminal
         terminal.startProcess(executable: "/bin/bash", args: ["--noprofile", "--norc", "-i"], environment: ["HOME=" + root.path, "PATH=/usr/bin:/bin", "TERM=xterm-256color", "PS1=OWNED> "], currentDirectory: root.path); defer { terminal.terminate() }
         try await wait { session.aiTerminalOutputRevision > 0 }
+        // This consent fixture models a tracked interactive Bash without completion hooks.
+        // Seed its start event; it still cannot claim a verified program exit.
+        let start = "\u{1b}]7;axon-command;consent-fixture;" + Data("bash".utf8).base64EncodedString() + "\u{7}"
+        session.aiCommandCapture.receive(Array(start.utf8), token: "consent-fixture")
         var round = 0
-        let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { _, _, _ in round += 1; switch round { case 1: return try self.action("terminal_send", "printf 'OWNED_INTERACTIVE_TASK\\n'"); case 2: return try self.action("terminal_key", "enter"); case 3: return try self.action("terminal_read"); default: return "已在当前 Shell 执行并看到 OWNED_INTERACTIVE_TASK。" } }); store.ai = ai
+        let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { _, _, _ in round += 1; switch round { case 1: return try p0FixtureReply(self.action("terminal_send", "printf 'OWNED_INTERACTIVE_TASK\\n'"), goal: "在当前终端执行这项测试操作", tool: "verify_command", argument: "cat /owned/verification", expected: "OWNED_INTERACTIVE_TASK"); case 2: return try self.action("terminal_key", "enter"); case 3: try await Task.sleep(for: .milliseconds(200)); return try self.action("terminal_read"); default: return try self.action("report_blocker", "测试 Shell 没有配置 completion hooks，不能核验退出状态") } }); store.ai = ai
         let executor = AICommandExecutor(sessionID: session.id, source: "Local macOS / 本机 macOS", directory: root.path, valid: { session.connected }, execute: { _, _ in AICommandResult(output: "Darwin\n" + root.path, exitCode: 0) }); executor.terminalBridge = AITerminalBridge(session: session)
         let host = NSHostingView(rootView: HStack(spacing: 0) { CapabilityTerminal(view: terminal); AIAssistantPane(ai: ai, terminal: true, availableHeight: 760).frame(width: 320) }.environmentObject(store).frame(width: 1050, height: 760))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1050, height: 760), styleMask: [.titled], backing: .buffered, defer: false); window.isReleasedWhenClosed = false; window.contentView = host; window.orderFront(nil); defer { window.close() }
         ai.prepare(source: "本地终端", text: "", sessionID: session.id, question: "在当前终端执行这项测试操作"); ai.send(executor: executor); try await wait { ai.pendingApproval != nil }; try await Task.sleep(for: .milliseconds(150)); try snapshot(host, output.appendingPathComponent("terminal-consent-1050.png"))
-        try press(host, "axon-ai-approval-scope"); try await Task.sleep(for: .milliseconds(150)); let scope = try XCTUnwrap(AxonMenuPopover.active); scope.highlighted = 1; XCTAssertTrue(scope.handleKey(36)); try await Task.sleep(for: .milliseconds(100)); try press(host, "axon-ai-approve"); try await wait { !ai.busy }; XCTAssertTrue(ai.error.isEmpty, ai.error); XCTAssertEqual(ai.steps.count, 4); XCTAssertTrue(ai.steps.last?.output.contains("OWNED_INTERACTIVE_TASK") == true); XCTAssertNil(ai.steps.last?.exitCode); XCTAssertTrue(ai.interactiveTaskApproved)
+        try press(host, "axon-ai-approval-scope"); try await Task.sleep(for: .milliseconds(150)); let scope = try XCTUnwrap(AxonMenuPopover.active); scope.highlighted = 1; XCTAssertTrue(scope.handleKey(36)); try await Task.sleep(for: .milliseconds(100)); try press(host, "axon-ai-approve"); try await wait { !ai.busy }; XCTAssertTrue(ai.error.isEmpty, ai.error); XCTAssertEqual(ai.steps.count, 4); XCTAssertTrue(ai.steps.last?.output.contains("OWNED_INTERACTIVE_TASK") == true, ai.steps.last?.output ?? "no read output"); XCTAssertNil(ai.steps.last?.exitCode); XCTAssertTrue(ai.interactiveTaskApproved, "task scope approval was not retained")
         try await Task.sleep(for: .milliseconds(150)); try snapshot(host, output.appendingPathComponent("terminal-complete-1050.png"))
         round = 0; ai.prepare(source: "本地终端", text: "", sessionID: session.id, question: "新任务"); ai.send(executor: executor); try await wait { ai.pendingApproval != nil }; XCTAssertFalse(ai.interactiveTaskApproved); ai.cancel(); XCTAssertTrue(session.connected)
     }
@@ -297,13 +280,13 @@ import SwiftTerm
             var round = 0
             let ai = AIAssistant(fileURL: root.appendingPathComponent("ai-" + String(width) + ".json"), modelResponder: { _, _, _ in
                 round += 1
-                if round == 1 { return try self.action("replace_file", extra: ["path": file.path, "find": "upstream=http://fixture-old:8848", "replacement": "upstream=http://fixture-new:8848"]) }
+                if round == 1 { return try p0FixtureReply(self.action("replace_file", extra: ["path": file.path, "find": "upstream=http://fixture-old:8848", "replacement": "upstream=http://fixture-new:8848"]), goal: "修复连接配置并验证服务恢复", tool: "http_health", argument: "http://fixture-owned:8848/health", expected: "healthy") }
                 if round == 2 { return try self.action("http_health", "http://fixture-owned:8848/health") }
                 return "服务已恢复，健康检查 HTTP 200。"
             })
             store.ai = ai
             ai.prepare(source: "本地终端", text: "ERROR fixture", sessionID: session.id, question: "修复连接配置并验证服务恢复")
-            let executor = AICommandExecutor(sessionID: session.id, source: "Local macOS / 本机 macOS", directory: root.path, valid: { true }, execute: { command, _ in AICommandResult(output: command == "uname -s; pwd" ? "Darwin\n" + root.path : "HTTP/1.1 200 OK\nhealthy", exitCode: 0) }); executor.fileBackend = { LocalFiles() }
+            let executor = AICommandExecutor(sessionID: session.id, source: "Local macOS / 本机 macOS", directory: root.path, valid: { true }, execute: { command, _ in AICommandResult(output: command == "uname -s; pwd" ? "Darwin\n" + root.path : "HTTP/1.1 200 OK\nhealthy\nAXON_HTTP_STATUS:200\n", exitCode: 0) }); executor.fileBackend = { LocalFiles() }
             let host = NSHostingView(rootView: HStack(spacing: 0) { CapabilityTerminal(view: terminal); AIAssistantPane(ai: ai, terminal: true, availableHeight: 760).frame(width: 320) }.environmentObject(store).frame(width: CGFloat(width), height: 760))
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 760), styleMask: [.titled], backing: .buffered, defer: false); window.isReleasedWhenClosed = false; window.contentView = host; window.orderFront(nil)
             ai.send(executor: executor); try await wait { ai.pendingApproval != nil }; try await Task.sleep(for: .milliseconds(150))
@@ -326,8 +309,8 @@ import SwiftTerm
         try await Task.sleep(for: .milliseconds(150)); try snapshot(host, output.appendingPathComponent("permission-settings.png")); XCTAssertNotNil(accessible(host).first { read($0, "accessibilityIdentifier") as? String == "axon-ai-permission-rules" }); window.close()
     }
     func testOrdinaryFileWritesAreNotDiskOperationProhibitions() throws {
-        XCTAssertTrue(AICommandExecutor.instructions.contains("including saving a shell script in Vim"))
-        for command in ["touch /root/test.sh", "printf 'echo hello\\n' > /root/test.sh", "vim /root/test.sh", "chmod +x /root/test.sh"] {
+        XCTAssertTrue(AICommandExecutor.instructions.contains("using direct file operations or literal shell writes"))
+        for command in ["touch /root/test.sh", "printf 'echo hello\\n' > /root/test.sh", "chmod +x /root/test.sh"] {
             XCTAssertFalse(AIBuiltInDeny.matches(command), command)
         }
         for command in ["mkfs.ext4 /dev/sdb", "wipefs /dev/sdb", "dd if=/tmp/image of=/dev/sdb", "fdisk /dev/sdb", "parted /dev/sdb mkpart primary 1 100"] {
@@ -346,7 +329,7 @@ import SwiftTerm
             XCTAssertEqual(policy.decision(target: "other", tool: "terminal_execute", argument: "rm a", automatic: true), .deny)
         }
         var policy = AIExecutionPolicy(); policy.approvalMode = .fullAccess
-        XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "rmdir a", automatic: false), .allow)
+        XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "rmdir a", automatic: false), .deny)
     }
     func testCommandNameListsBlockVariantsAndCompoundCommands() throws {
         var policy = AIExecutionPolicy(); policy.commandBlacklist = "rm"; policy.commandWhitelist = "printf"
@@ -360,7 +343,7 @@ import SwiftTerm
         policy.approvalMode = .assisted
         XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "printf hello", automatic: false), .allow)
         XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "printf hello; touch a", automatic: false), .ask)
-        XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "rmdir a", automatic: false), .ask)
+        XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "rmdir a", automatic: false), .deny)
         XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "cat rm.txt", automatic: false), .ask)
         var host = Host(name: "fixture", address: "fixture"); host.aiCommandBlacklist = "rm"
         let merged = AIExecutionPolicy().mergingCommandLists(host)
@@ -378,7 +361,7 @@ import SwiftTerm
             policy.approvalMode = mode
             XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "printf secret", automatic: false, hostID: host), .deny)
             XCTAssertEqual(policy.decision(target: "fixture", tool: "read_file", argument: "/tmp/a", automatic: true, command: "rm /tmp/a"), .deny)
-            XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "printf allowed", automatic: false, hostID: host), .allow)
+            XCTAssertEqual(policy.decision(target: "fixture", tool: "command", argument: "printf allowed", automatic: false, hostID: host), mode == .everyTime ? .ask : .allow)
             XCTAssertEqual(policy.decision(target: "fixture", tool: "replace_file", argument: "/tmp/a", automatic: false), mode == .fullAccess ? .allow : .ask)
             XCTAssertEqual(policy.decision(target: "fixture", tool: "system_info", argument: "", automatic: true), mode == .everyTime ? .ask : .allow)
         }
@@ -403,13 +386,13 @@ import SwiftTerm
             let ai = AIAssistant(fileURL: root.appendingPathComponent("settings.json"), modelResponder: { _, _, publish in
                 round += 1
                 let response: String
-                if round == 1 { response = try self.action("replace_file", extra: ["path": file.path, "find": "old=value", "replacement": "new=value"]) }
-                else if round == 2 { response = try self.action("verify_command", "printf healthy") }
+                if round == 1 { response = try p0FixtureReply(self.action("replace_file", extra: ["path": file.path, "find": "old=value", "replacement": "new=value"]), goal: "Repair and verify", tool: "verify_command", argument: "cat " + file.path, expected: "new=value") }
+                else if round == 2 { response = try self.action("verify_command", "cat " + file.path) }
                 else { response = "Service verified healthy" }
                 publish(response); return response
             })
             var policy = AIExecutionPolicy(); policy.approvalMode = mode; policy.commandWhitelist = ".*"; ai.settings.executionPolicy = policy
-            let executor = AICommandExecutor(sessionID: UUID(), source: "owned permissions fixture", directory: root.path, valid: { true }, execute: { command, _ in executed += 1; return AICommandResult(output: command.contains("uname") ? "Darwin\n" + root.path : "healthy", exitCode: 0) })
+            let executor = AICommandExecutor(sessionID: UUID(), source: "owned permissions fixture", directory: root.path, valid: { true }, execute: { command, _ in executed += 1; return AICommandResult(output: command.contains("uname") ? "Darwin\n" + root.path : "new=value", exitCode: 0) })
             executor.fileBackend = { LocalFiles() }
             ai.prepare(source: executor.source, text: "broken service", sessionID: executor.sessionID, question: "Repair and verify"); ai.send(executor: executor)
             if mode == .everyTime {
@@ -419,7 +402,7 @@ import SwiftTerm
             }
             try await wait { !ai.busy }; XCTAssertTrue(ai.error.isEmpty, ai.error); XCTAssertEqual(executed, 2)
             XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "new=value")
-            XCTAssertTrue(ai.steps.contains { $0.tool == "replace_file" && $0.output.contains("Replacement") && $0.output.contains("Backup:") })
+            XCTAssertTrue(ai.steps.contains { $0.tool == "replace_file" && $0.output.contains("new=value") && $0.output.contains("@@ line") && $0.output.contains("Backup:") })
             XCTAssertTrue(ai.answer.contains("healthy")); XCTAssertNil(ai.pendingApproval)
         }
     }

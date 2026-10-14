@@ -60,7 +60,7 @@ import XCTest
         try capture(hosting, name: "application-icon-picker")
     }
 
-    func testGeneralIconSelectionRemainsDraftAndRevertRestoresSavedChoiceAt650Width() async throws {
+    func testGeneralIconSelectionAppliesAutomaticallyAt650Width() async throws {
         _ = NSApplication.shared
         let restore = enableAccessibility(); defer { restore() }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("axon-icon-preferences-" + UUID().uuidString)
@@ -83,17 +83,14 @@ import XCTest
         XCTAssertTrue(black.selected)
         XCTAssertTrue(white.accessibilityPerformPress()); try await settle(hosting)
         XCTAssertTrue(white.selected); XCTAssertFalse(black.selected)
-        XCTAssertEqual(store.workspace.preferences, original, "Icon selection must stay in the draft until Save")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
-        try capture(hosting, name: "preferences-application-icon-white-draft-650")
-        let revert = try XCTUnwrap(nodes(hosting).first { $0.read("accessibilityIdentifier") as? String == "axon-preferences-revert" })
-        XCTAssertTrue(revert.press()); try await settle(hosting)
-        let restored = find(ApplicationIconChoiceNativeButton.self, in: hosting)
-        XCTAssertTrue(try XCTUnwrap(restored.first { $0.iconStyle == "black" }).selected)
-        XCTAssertFalse(try XCTUnwrap(restored.first { $0.iconStyle == "white" }).selected)
+        XCTAssertEqual(store.workspace.preferences.applicationIcon, "white")
+        XCTAssertEqual(try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: store.fileURL)).preferences.applicationIcon, "white")
+        try capture(hosting, name: "preferences-application-icon-white-auto-650")
+        XCTAssertTrue(black.accessibilityPerformPress()); try await settle(hosting)
+        XCTAssertTrue(black.selected); XCTAssertFalse(white.selected)
         XCTAssertEqual(store.workspace.preferences, original)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
-        try capture(hosting, name: "preferences-application-icon-black-restored-650")
+        XCTAssertEqual(try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: store.fileURL)).preferences.applicationIcon, "black")
+        try capture(hosting, name: "preferences-application-icon-black-auto-650")
     }
 
     private final class IconDraft: ObservableObject {

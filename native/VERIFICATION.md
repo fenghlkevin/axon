@@ -1346,3 +1346,469 @@ Running after: 12973
 - Viewed NSHostingView screenshots `/tmp/axon-0150-ui/permissions-1050.png` and `permissions-1400.png`: the revised label wraps cleanly with no clipping.
 - Existing unrelated working-tree changes retained. Installation/restart not performed; current application sessions retained.
 - Release package completed: `native/dist/Axon-0.17.2-mac-arm64.zip`; package script strict/deep codesign verification passed; `unzip -t` reported no errors.
+
+
+## 2026-10-08 · 0.17.2 / build 152 · Axon 文件变更与整组回滚（第一版）
+- 新增独立“文件变更”工作区入口。服务器时间线、文件筛选、修改前后差异、人工变更组和完整组回滚预览；文件视图明确包含关联文件，没有单文件回滚入口。
+- Axon 内置文本编辑、外部编辑器回传及 AI replace_file 在写入前持久化原始/待写入内容与权限，完成后校验字节。AI 同一次执行的连续文件替换按组记录，人工可开始/结束分组；其他来源介入会结束连续合并。
+- 撤销整组保留后续不涉及该组文件的变更；重叠文件暂停，第一版不做 Git 三方合并。时间节点恢复覆盖该节点及后续完整变更组；经过既有回滚或未完成记录的时间范围暂停，不能跨越这些节点恢复。回滚生成独立历史记录，原组保留。
+- 回滚前校验组内容、所有当前文件及权限；每次替换再检查。持久化当前版本并保留目标目录备份，再写入恢复内容；失败时补偿已恢复文件并检查所有目标（包括失败项），补偿失败标记 partial 并保留快照，不误报成功。检查变更不能把正在回传的文件判为中断。重启后的未完成保存按 before/after 核对，其他状态保持阻塞。
+- 范围限制：仅已有普通 UTF-8 文本文件（跟踪/外部编辑 32 MB，内置编辑 2 MB，原 AI 替换 64 KB），新文件/目录不纳入。记录内容与 POSIX 权限，不恢复所有者、ACL、扩展属性；不自动重启服务。日志总量达到 256 MB 时暂停新的受管写入。快照保存在本机 FileHistory/history.json（目录 0700、文件 0600），未加密。
+- 终端/Vim/其他程序修改需事先跟踪文件，再点击“检查变更”；记录检查时发现的版本，来源未知，不保证捕获每次中间保存，没有后台远程文件监控。AI 终端命令也属此范围，不能声称所有 AI 命令均自动备份。重启后远程回滚需在 SFTP 连接原账号/地址/端口。
+- 最终 29 项测试全部通过（0 失败、0 跳过），/tmp/axon-0172-final-tests.log。覆盖 AI 实际动作回路写入历史、两文件连续修改合并/持久化/权限、整组恢复、后续重叠拒绝/时间节点恢复、预览过期、外部修改、写入中刷新拒绝、中断保存核对、第二文件失败补偿、补偿失败 partial、损坏日志阻止写入；包含 OperationsFeatureTests、FileWorkflowNavigationTests、既有 AI 配置冲突测试。
+- 实际 MainView / NSHostingView / NSWindow 1050/1400pt 界面及 sheet 已亲自打开检查：native/dist/ui-0.17.2/ 的 history、expanded、file-timeline、restore、restored、target-popover，以及 English empty/error。按钮、长路径换行、选择与差异无裁切；AX 实际点击开始/完成分组、差异展开收起、下拉键盘选文件/返回全部、回滚取消、勾选前禁用/勾选后启用、确认恢复均通过。隔离本机夹具完成，不连接用户服务器。
+- 最终 release 构建 /tmp/axon-0172-package-final.log（95.29 秒），严格 codesign 与 ZIP 完整性通过。ZIP SHA-256：908ca8f055c0b9986c98c816dd2d12b943850d3abcbb3b5c872324229be668d9。
+- 已备份旧版到 native/dist/backups/Axon-0.17.1-before-0.17.2-20261008-162852.app 并安装 /Applications/Axon.app 0.17.2/build152，保留白色图标。安装包/临时安装目录/安装后二进制散列和签名核验通过。进程 PID 安装前后均 32941，未退出、启动或重启应用；新版需要用户主动重启加载。回执 native/dist/installation-0.17.2.txt，日志 /tmp/axon-0172-install.log。
+
+## 2026-10-08 — Critical-operation boundary and ordinary commands (0.17.3 / 153)
+
+- User confirmed physical deletion, formatting and shutdown/reboot remain prohibited. Retained disk/partition/block-device, destructive SQL/container and package-removal prohibitions; added `rmdir`. Package install/upgrade and SQL UPDATE now follow permission rules.
+- Added `od`; explicitly named ordinary commands no longer fail just because they are absent from the known-command list. Blacklists, permission modes and executable/script inspection still apply.
+- Unsupported inspection now requests an equivalent inspectable action and continues the model loop; concrete denied script operations still block execution. Added recovery regression using an unexecuted Python action followed by a literal verification command.
+- Native permissions page inspected at 1050/1400: `/tmp/axon-0150-ui/permissions-1050.png`, `permissions-1400.png`; revised text wraps without clipping. Permission UI and local Vim interactions passed.
+- Selected rule/capability/inspection tests: 27 passed, zero failures after excluding the separately reproduced `testLiveTerminalShellREPLDatabaseAndFullScreen` shell-hook readiness timeout (5 cascading assertions). This unresolved test is not counted as passed. Logs: `/tmp/axon-critical-tests.log`, `/tmp/axon-critical-repl.log`, `/tmp/axon-critical-final-tests.log`.
+- One existing FileHistoryTests optional UUID compilation failure was repaired with `XCTUnwrap`; product file-history code unchanged by this task. Other concurrent workspace changes preserved.
+- Installation/restart not performed; current user sessions retained.
+- Release package completed: `native/dist/Axon-0.17.3-mac-arm64.zip`; strict/deep codesign verification and ZIP integrity checks passed.
+
+## 2026-10-08 · 0.17.3 / build 153 · 显式文件监控与 MD5 回滚门禁
+- 文件修改不再自动加入监控。先在 SFTP 选择文件/目录的监控菜单，或在“文件变更”输入绝对路径；持久化文件内容、MD5、SHA-256 与 POSIX 权限。目录递归建立每个文件的基线，忽略符号链接及 Axon 临时备份；新增文件只建立基线，不进行创建回滚。单文件上限 32 MB，单目录 500 文件、1000 目录、32 层，初次新增基线内容 128 MB、历史归档总量 256 MB。
+- Axon 受管编辑保存按组写入时间线并更新可信版本。连接可用时每 10 秒核对；其他 SSH、终端/Vim 或未知程序修改仅记为外部冲突，不自动提升为可信版本。刷新不解除冲突。回滚预览/提交检查全部关联文件与每次替换前当前内容，MD5/SHA-256/字节或权限不同即阻止恢复。
+- 文件/目录可解除监控；目录中的单文件解除以排除路径持久化。解除保留历史，旧变更组锁定；重新监控分配新身份，旧组不会重新获得回滚权限。旧版未显式选取的自动跟踪记录只保留历史，需要重新选取监控范围。
+- 监控不是服务器审计代理：轮询不能保证捕获每次短暂修改，显示发现时间；SFTP 校验与重命名之间不能提供跨 SSH 的原子事务锁。恢复内容和 POSIX 权限，不恢复所有者/ACL/xattrs，不自动重启服务。快照仍在本机；断线暂停检查，重启后需要 SFTP 重连。
+- 最终相关测试 34 项通过，零失败：/tmp/axon-0173-final-tests.log。覆盖显式监控、递归/二进制基线和 MD5、持久化排除、新文件发现、解除/重建身份、外部 SSH MD5 锁定整组、刷新不能解锁、写入中检查、中断保存、失败补偿及导航/操作回归。
+- 已亲自打开 native/dist/ui-0.17.3/ 原生 MainView/NSHostingView 截图：1050/1400pt 正常历史、空/错误英文、差异、文件筛选、选择浮层、恢复 sheet、恢复结果、外部冲突和解除监控。实际 AX 点击解除监控确认历史保留、回滚按钮禁用；回滚取消/确认、差异收起/展开、选择键盘及复选启用行为均通过。隔离本机夹具，没有在用户服务器修改文件。
+- 最后解除监控状态文案修复单独原生 UI 测试通过：/tmp/axon-0173-stop-ui.log；monitoring-stopped-1400.png 已重新打开检查，不再显示“监控中”。
+- 最终 release 构建通过（93.86 秒，/tmp/axon-0173-package-final.log），strict/deep codesign 与 unzip 完整性通过。ZIP SHA-256：c5e6676744ef1f7c0dfaadd4efefb5159bfc701ad278d2775695a1d1dc7abbad。
+- 已安装 /Applications/Axon.app 0.17.3/build153，备份 native/dist/backups/Axon-0.17.2-before-0.17.3-20261008-171103.app。安装临时包与安装后二进制/签名校验通过，保留白色图标。运行进程安装前后 PID 均 48528；没有退出、启动或重启，用户主动重启后加载新版。回执 native/dist/installation-0.17.3.txt；安装日志 /tmp/axon-0173-install.log。
+
+## 2026-10-08 · 0.17.4 / build 154 · 撤除文件监控、时间线和回滚功能
+- 按用户要求撤除本轮新增的文件变更主导航/页面、SFTP 监控与解除菜单、后台轮询、快照历史模型与回滚执行器、AI replace_file 和人工编辑的历史接入。原有文件编辑、外部编辑器、AI 执行和权限规则保留。相关代码与补丁备份 /tmp/axon-rollback-feature-source-backup；现有用户历史数据和服务器旁路备份未删除，旧原型不再作为当前产品方案。
+- 精确反向应用已审阅的本功能变更段落，保留其他未提交权限变更；源码及测试搜索不再存在 FileChangeHistory/FileHistoryTarget/fileHistory 接入。
+- 文件流程、外部编辑往返/内容冲突和权限保留、操作回归测试 19 项通过：/tmp/axon-0174-tests.log。原生导航和文件布局 5 项通过：/tmp/axon-0174-ui.log；导航测试实际在 1050/1400pt 切换工作区/设置并确认既有会话保留。
+- 已亲自打开 native/dist/ui-0.17.4/workspace-sidebar-main-1400.png 和 workspace-page-hosts-1050.png，确认“文件变更”入口消失、既有侧栏布局正常；不连接用户服务器。
+- 用户确认新设计方向是简单可靠的备份与恢复；本版本只移除旧实现，未把重新设计方案实现为产品。
+- Release 91.75 秒通过：/tmp/axon-0174-package.log。严格 codesign 与 ZIP 完整性通过，ZIP SHA-256 b215b60012f88384920a965498ab92dd495cf8b1a1f2df439dbb233438d1db44。
+- 已备份 native/dist/backups/Axon-0.17.3-before-0.17.4-20261008-172349.app 并安装 /Applications/Axon.app 0.17.4/build154，保留白色图标。安装前后 PID 均 56323，未重启；主动重启后加载移除版。回执 native/dist/installation-0.17.4.txt；日志 /tmp/axon-0174-install.log。
+
+
+## 2026-10-08 · 0.18.0 / build 155 · AI P0 可靠执行与目标验收
+
+- ChatGPT API 使用严格 `axon_step` function tool；Claude API 使用命名 tool_use；Codex app-server 使用 outputSchema。执行器只接收完整单次结构化动作，拒绝不完整流、多动作、额外字段和非法参数；真实提供方不再依赖 Markdown 动作解析。格式错误最多修复三轮。
+- 模型请求对限流、指定瞬时 HTTP/网络错误进行最多两次退避重试，支持 Retry-After；认证、配置错误及取消不重试。重试范围仅模型请求，不重放已执行命令。流中断时工具参数不执行、不显示原始 JSON；取消及续跑保留实际任务状态。
+- 持久化原目标、目标主机/目录、应用执行约束、模型假设/决策/待办、实际动作退出码和首次失败。上下文压缩保留目标和冻结验收条件；任务记录超过 3 MB 时压缩旧历史/输出，保留活动任务工作记忆与验收状态。模型摘要不能授予执行权限或充当验收证据。
+- 修改前固定绑定原目标、精确工具/参数和预期内容的只读验收计划；每次修改使之前证据失效，后续失败也撤销已通过状态。未通过全部条件、终端输入未提交或没有新命令完成证据时，禁止声称完成。当前终端采用真实 shell hook 的新命令输出及退出码，多个只读检查互不清空。HTTP 检查要求 curl 最终状态尾标为 2xx，代理 CONNECT 200 与最终 302 不会误判。
+- 验收检查是可审阅的明确条件与观测匹配，不是对任意自然语言目标的形式化证明；既有权限、批准、脚本检查和禁令继续生效。用户原有未提交改动保留。
+- 最终回归：`swift test --package-path native --filter 'AI|CodexReplyTests|CodexRuntimeTests'`，82 项、2 项选择性 CLI 测试跳过、0 失败（87.604 秒）。独立启用 `AXON_TEST_CODEX=1` 的真实 Codex 只读任务 smoke 通过：结构化动作读取自有临时合成日志并返回正确服务名。另一个通用 CLI smoke 没有单独启用，不计为通过。日志位于 `native/dist/verification-0.18.0/`。
+- OpenAI/Anthropic 原生协议使用隔离本机 HTTP 夹具，覆盖 429、流中断、成功、401 不重试和写入不重放；没有调用这两家真实云端 API。真实 Bash shell hook 夹具验证两个文件检查和多条件通过；没有连接或操作用户服务器。
+- 真实 NSHostingView/MainView 截图和交互测试覆盖 1050/1400pt、收窄助手面板、重连、验收通过、认证错误、批准差异与历史。已打开检查重连两个提供方、验收、认证错误和既有批准/恢复状态截图，无裁切。新增截图 `native/dist/ui-0.18.0/`；批准/历史截图沿用 `/tmp/axon-task-capabilities-ui/`。
+- 本轮仅源码和发布包交付，不安装、不重启应用，不中断既有 SSH/SFTP 会话。
+- Release 构建通过（92.82 秒），版本/构建号/图标资源核验通过；严格 deep codesign、ZIP 完整性、ZIP 内外可执行文件 SHA-256 一致性检查通过。发布包 `native/dist/Axon-0.18.0-mac-arm64.zip`，ZIP SHA-256：949a60398c32150a419beec0daf23403e04b2b4699f05814b877c6d03694d410。
+
+## 2026-10-08 · 0.18.1 / build 156 · Vim 内部操作自动允许
+- 增加状态限定的 Vim 内部白名单：已验证的 shell hook 当前命令必须为 vim/vi/nvim，不能以终端文本或历史日志推断；未知模式先 Escape 进入普通模式。允许常用移动、删除/复制/粘贴缓冲内容、撤销、进入插入模式及纯文本输入、插入换行、行号/取消高亮、普通字面替换和不保存退出。不是命令名 vim 的泛化 Shell 白名单。
+- :w/:wq/:x/ZZ 等保存不属于内置白名单；保存仍走现有批准规则。:! 外部命令继续执行代码检查，Vimscript、映射、宏、未知命令不自动允许。黑名单、全局禁止和显式 ask/deny 优先；每次批准模式仍逐次确认，完整权限沿用现有语义。
+- 人工输入、非白名单模式键、嵌入控制字符使模式证据失效；不能将退出插入模式后的保存当作文本放行。现有命令批准后 Enter 不重复批准逻辑保留。
+- 最终 10 项测试通过：/tmp/axon-vim-whitelist-final.log。包括状态/保存边界、控制字符、明确黑名单/每次批准、外部执行代码检查，以及真实 LocalTerminal+Vim 的 Escape/插入内部白名单、保存非白名单、保存退出、Shell hook 验证脚本输出与退出码。实际本机隔离夹具，不使用用户服务器。
+- 已打开检查原生 Vim 插入界面 /tmp/axon-0167-ui/vim-insert.png；文本与 INSERT 状态正常。脚本执行由 hook 和文件内容核验；vim-executed.png 仍为缓存的插入画面，未将其计作脚本执行画面验收。没有修改 Axon 控件或布局。
+- 最终补充“:set number → 读取画面 → Enter”真实流程，并模拟与 AI 回路一致的输入授权；Enter 确认为 terminal_program_submit，不能因已批准输入而绕成 Shell 命令。Shell 提交回归一起运行，最终 13 项通过（同 /tmp/axon-vim-whitelist-final.log，取代前述 10 项计数）。
+- 最终 release 88.30 秒通过：/tmp/axon-0181-package-final.log；严格 codesign 与 ZIP 完整性通过。ZIP SHA-256 f3ce5526c925f023589ddc5ea5ae301a3f49e7bfe20bf182ad258d4cf0672ca3。
+- 已备份 native/dist/backups/Axon-0.17.4-before-0.18.1-20261008-182902.app 并安装 /Applications/Axon.app 0.18.1/build156，临时包与安装后二进制/签名校验通过，保留白色图标。安装前后 PID 均 73642；未退出或重启，主动重启后加载新版。安装回执 native/dist/installation-0.18.1.txt；日志 /tmp/axon-0181-install.log。
+
+## 2026-10-08 · 0.18.2 / build 157 · 模型任务响应校验兼容修复
+- 针对截图在首次观察后出现“模型任务响应无效”，本机历史只记录通用拒绝提示，未保留原始模型响应，因此不能确认该次具体字段。代码中复现 checks=[] 被 configure 拒绝的问题；将空数组与 null 均解释为不更新验收条件，保留已固定检查和修改后验证门槛。
+- 验收目标不一致、脚本被错误用作只读验收命令时，向模型提供具体纠正原因；checks.tool 的 schema 限制为支持的只读验收工具。无效操作仍不执行，权限和内置 deny 未放宽。
+- 15 项模型响应、重试、Vim 权限、当前终端新鲜 hook 与验收回归通过：/tmp/axon-0182-tests.log。新回归验证首次检查空数组可通过、修改后空数组不能清除固定检查或提前结束。
+- 实际 NSHostingView 1050/1400pt 原生渲染夹具运行，已打开检查 /tmp/axon-p0-ui/reconnecting-chatgpt-1050.png、verified-chatgpt.png、credentials-error-chatgpt.png；对话、执行/验证与错误状态正常，本次没有改变布局。未在用户 SSH 服务器重放请求或验证真实 Codex 返回。
+- 真实 LocalTerminal+Vim 编辑、保存并执行脚本回归通过（1 项）：/tmp/axon-0182-vim.log。本机隔离夹具，未操作用户服务器。
+- release 构建 100.01 秒完成，严格 codesign 与 ZIP 完整性校验通过。已安装 /Applications/Axon.app 0.18.2/build157，安装前后包二进制一致；按用户要求不保留旧版备份，未启动或重启应用。回执 native/dist/installation-0.18.2.txt，日志 /tmp/axon-0182-package.log、/tmp/axon-0182-install.log。ZIP SHA-256 be19b55fd64ac0154fb575ed13a2129004b340e8efc8e9fa7e89767a32b0adb9。
+
+## 2026-10-08 · 0.18.3 / build 158 · 精简来源筛选
+- 操作历史来源下拉去掉“AI + 人工”和“来源未知”，仅显示全部来源、AI、人工。仅修改筛选选项，不迁移或删除历史记录。
+- 运行现有 testHistorySourceFilterAndColoredBadgesUI 原生界面验收通过，1050/1400pt 实际展开菜单、键盘选择 AI 及追加记录后保留筛选均通过。已打开观察 /tmp/axon-0160-ui/source-menu-1050.png 与 history-ai-1400.png，菜单三项正确、筛选结果正常。日志 /tmp/axon-0183-ui.log；git diff --check 通过。
+- release 构建 93.75 秒完成，严格 codesign 与 ZIP 完整性校验通过；已安装 /Applications/Axon.app 0.18.3/build158，二进制一致。按用户要求无旧版备份，未启动或重启应用。回执 native/dist/installation-0.18.3.txt，日志 /tmp/axon-0183-package.log、/tmp/axon-0183-install.log。
+
+## 2026-10-09 · 0.18.4 / build 159 · AI 禁用交互式编辑器及命令输出边界修复
+- AI 内置禁止 vi/vim/nvim/vimdiff/view/gvim/nano/pico/emacs/emacsclient/joe/micro/ed/ex；绝对路径、sudo、复合命令和解释器字面脚本均命中。三种权限模式、白名单及允许规则不能覆盖。已运行编辑器的 AI 输入在终端桥接与执行代码检查处拒绝；仅限制 AI 通道，人工输入路径不变。删除旧 Vim 内部自动允许逻辑和相应状态/测试源文件，更新模型提示与设置中的不可编辑说明。
+- 模型改用直接文件替换或可检查的字面 printf/tee/重定向；文件变更仍遵循既有批准、脚本检查和修改后验收规则。
+- 本机 Bash 复现子 Shell 创建命令缺少完成证据；修复为继承 DEBUG 跟踪，并隔离整个 PROMPT_COMMAND，使原提示符脚本不产生伪命令。提示符结束统一关闭输出范围，保留原退出码；历史去重命令仍有独立记录。Bash 提示符命令替换不再被计为执行操作。
+- AI 验收序号改为真正完整的 start/end 捕获对；孤立 end 和空回车不会刷新旧命令证据，禁止将旧结果当作新验收。
+- 48 项相关回归通过：/tmp/axon-0184-tests-final.log；最后增加提示符命令替换保护后 14 项受影响路径复验通过：/tmp/axon-0184-prompt-final.log。保留原失败复现日志 /tmp/axon-0184-hook-before.log。
+- 完整本机真实终端流程通过：子 Shell printf 新建 test.sh → cat → sh → cat，输出 hello world、文件字节正确、验收 PENDING 清除。独立执行通道未调用，模型使用可控夹具响应，未重放用户服务器或真实模型。/tmp/axon-0184-hello.log。
+- 1050/1400pt 实际 NSHostingView 设置与交互验收运行，已打开检查 /tmp/axon-0150-ui/permissions-1050.png、permissions-1400.png，新增 AI 编辑器禁止说明可读、无裁切。git diff --check 通过。新钩子需要新 SSH/本机 Shell 会话，安装不主动中断现有连接。
+- release 构建 92.94 秒完成，严格 codesign 和 ZIP 完整性通过。已安装 /Applications/Axon.app 0.18.4/build159，暂存包及安装后二进制一致，保留白色图标；按用户要求无旧版备份，未启动或重启应用。回执 native/dist/installation-0.18.4.txt，日志 /tmp/axon-0184-package.log、/tmp/axon-0184-install.log。ZIP SHA-256 a851749f72c7fdfe8ac4a299787b4b9f3e5b62ef71c02ba713c8f157bfe41b21。
+
+## 2026-10-09 — 0.18.5 (160), relative script execution directory
+
+- Root cause reproduced from the user's persisted task: shell-hook history reported `/root/ai-test`, while terminal currentDirectory was unknown; relative `sh ./hello.sh` therefore failed closed before execution. Creation and content verification had succeeded; actual script execution was blocked.
+- Authenticated shell-hook metadata now updates the terminal directory, with absolute-path/control-character validation. Prompt completion reports the directory again after `cd`; command-output evidence retains the directory from command start. Invalid tokens/relative metadata cannot overwrite it.
+- Real local Bash/SwiftTerm regression creates a script by relative path after changing to a different directory, checks it, executes `sh ./test.sh`, captures `hello world` with exit 0, and completes the frozen check. No commands were executed on the user's server.
+- `/tmp/axon-0185-tests-final.log`: 21 tests passed, including script inspection, history protocol and native reply expansion/collapse interaction. `/tmp/axon-0185-directory-final.log`: 20 tests passed after adding post-cd prompt metadata, including the real terminal workflow and invalid-token/path regression.
+- NSHostingView screenshots `/tmp/axon-0171-ui/unified-320.png` and `unified-600.png` opened and visually inspected: reply box, directory label and composer fit both widths. Existing actions menu toggled open/closed successfully in the render test. No UI redesign in this fix.
+- Existing immutable deny/script content checks remain in place. `git diff --check` passed.
+- Release packaging succeeded (93.76 seconds), `/tmp/axon-0185-package.log`. Installer verified strict deep codesign, ZIP integrity, installed version/build and matching executable digest. Installed `/Applications/Axon.app` 0.18.5 (160), no retained backup and no restart; white Finder icon preserved. Receipt: `native/dist/installation-0.18.5.txt`, log `/tmp/axon-0185-install.log`. ZIP SHA-256: `36e5bd984a78ce6aa452954153f43ceff2541f619ab541da8d5e811ddb24731d`.
+- Running windows/SSH were preserved. User must restart Axon and reconnect SSH to load the updated prompt-directory hook.
+
+## 2026-10-09 — 0.18.6 (161), atomic terminal operations
+
+- Ordinary current-terminal commands now submit once with Return and receive a unique execution ID. Matching shell-hook blocks return actual output, exit code and latest directory; long operations return starting/running and are polled by ID. A running operation cannot be declared finished or duplicated. Human input pauses the task; cancellation does not interrupt the running program.
+- Direct file reads/listing and the existing diff-based file replacement use the pinned file endpoint in current-terminal tasks. Relative paths follow authenticated terminal directory metadata. Immutable deny, script inspection, approval, conflict and post-change verification checks remain enforced.
+- Verification consumes actual captured output, not command metadata, and requires a completed, untruncated block newer than the mutation. The local hello-world creation/read/run/verification fixture now takes four operations rather than staged text/Return pairs. No commands were executed on the user's server; model replies used controlled fixtures.
+- Final focused run: 10 tests passed, `/tmp/axon-0186-final-check.log`, including exact-ID capture, long task/human takeover, cancellation, one approval per command, direct file diff/read verification, premature completion refusal and native interactions.
+- Opened and inspected actual NSHostingView screenshots `/tmp/axon-0171-ui/actions-open-320.png`, `actions-open-600.png`, `actions-closed-320.png`: running status readable, narrow wrapping fits, grouped reply expansion/collapse and composer remain usable.
+- Warp public implementation was researched for the execution/block-ID pattern; no Warp source was copied. Existing user changes were retained. Live authenticated model smoke tests remain opt-in.
+- Final broad regression `/tmp/axon-0186-all-passed.log`: 94 tests, 2 opt-in model tests skipped, 0 failures (86.38 seconds). An earlier settings temporary-directory cleanup error did not recur in the focused or final broad run; outdated channel-rejection fixtures were updated for the intentional current-terminal command routing. `git diff --check` passed.
+- Release build completed in 95.49 seconds, `/tmp/axon-0186-package.log`. Installer verified strict deep codesign, ZIP integrity, expected version/build and matching executable digests before and after replacement. Installed `/Applications/Axon.app` 0.18.6 (161), no retained backup, no restart, white Finder icon preserved. Receipt: `native/dist/installation-0.18.6.txt`; log `/tmp/axon-0186-install.log`. ZIP SHA-256: `5166eb77e310ddd4641bc550190368063bef0f623db7017e8c053f20fe79afee`.
+- Existing windows/connections remain running the previous loaded binary. Restart Axon and reconnect SSH to use the new execution protocol; no live remote-server or live-model end-to-end claim is made.
+
+## 2026-10-09 — 0.18.7 (162), model reply repair diagnostics
+
+- Inspected the actual persisted task from the screenshot: two successful empty directory reads, followed by a goal mismatch rejection and two generic invalid-reply rejections. Raw rejected model replies were not persisted, so the later exact malformed fields cannot be established. No remote request was replayed.
+- Goal matching tolerates whitespace-only formatting differences, preserves every non-whitespace character and canonicalizes accepted checks to the application goal. Changed requirements remain rejected; frozen tools/arguments/expected outputs remain unchanged. Frozen check prompts now include the goal field.
+- Schema key/type and command validation errors return specific repair hints instead of treating every failure as an unspecified JSON error. After exhausted repairs, the final error retains the last rejection reason. Empty directory inspection explicitly reports an empty directory. No deny, approval or script-inspection boundary was relaxed.
+- Focused tests `/tmp/axon-0187-tests.log`: 19 tests passed, including whitespace canonicalization, changed-goal rejection, malformed action hints and real local shell script creation/execution/verification.
+- Final broad run `/tmp/axon-0187-final.log`: 95 tests, 2 opt-in model tests skipped; all tests except the legacy shell/REPL/database/full-screen fixture passed. That fixture timed out while loading hooks after terminal CR translation changed. Added an explicit stty sane + LF restoration to the owned fixture, without production changes; isolated final run `/tmp/axon-0187-live-final.log` passed (1 test). Earlier failure logs are retained.
+- Native error-render test passed; opened and inspected `/tmp/axon-0187-ui/model-error-320.png` and `model-error-600.png`: concrete rejection message wraps inside the grouped answer at both widths. `/tmp/axon-0187-ui-live.log` records the UI pass and pre-fix terminal fixture failure separately. `git diff --check` passed.
+- Release build completed in 90.29 seconds (`/tmp/axon-0187-package.log`). Installer verified strict deep codesign, ZIP integrity, version/build and identical staged/installed executable digests. Installed `/Applications/Axon.app` 0.18.7 (162), no old-version backup, no restart; white Finder icon preserved. Receipt `native/dist/installation-0.18.7.txt`, log `/tmp/axon-0187-install.log`. ZIP SHA-256 `b75b2c94df7457f4b94d89ed061bdc88bfaa32e5f8c8b57254fb6869b093b824`. Existing windows and connections preserved. No live-model/live-user-server end-to-end assertion.
+
+## 2026-10-09 — 0.18.8 (163): persistent Codex tool conversation
+
+- Codex task execution now uses one app-server process/thread per Axon conversation, native axon_step tool calls, exact RPC/call IDs and real Axon results. Follow-up questions retain the thread. Plain final answers do not require model-authored JSON. Other API providers retain their existing protocol.
+- Incremental tool feedback retains pinned goal/current verification while avoiding replay of the whole accumulated transcript at every operation. Cancellation/new conversation closes only the model process; remote PTY sessions remain connected. Unknown or duplicate tool requests fail closed. Effective inherited MCP server names are explicitly disabled for the model thread.
+- Fixed unstable JSON settings identity (sorted encoding) that recreated the thread between steps. Fake protocol tests verify one process, one thread, follow-up continuity, exact result association, duplicate rejection and inherited server isolation.
+- Actual locally authenticated Codex + isolated Bash PTY + owned temporary directory: script creation, actual execution producing hello world and final verified completion passed (44.764s, /tmp/axon-0188-isolation.log). No user SSH server was used. Earlier fake fixtures used hardcoded response IDs; updated to echo request IDs and reran successfully.
+- AI/terminal/permissions/file/history regression: 106 tests, 3 opt-in model tests skipped, zero failures (/tmp/axon-0188-regression.log). Real Codex task was separately executed above. git diff --check passed.
+- Native NSHostingView rendering and real toggle tests passed; opened/inspected /tmp/axon-0171-ui/actions-open-320.png and /tmp/axon-0187-ui/model-error-{320,600}.png. Unified reply, narrow wrapping, error state and controls remain usable.
+- Release/package/install outcome follows below; existing application is not restarted and old version is not backed up, per user authorization.
+- Release succeeded (94.33s); strict codesign and ZIP integrity checks passed. Installed /Applications/Axon.app 0.18.8 (163), source/stage/installed executable SHA-256 matched; receipt native/dist/installation-0.18.8.txt. ZIP SHA-256: 48ef102f9a78dfb0c106bad9e1bdcb150dc30444b8e591fdb062d631ea04541f. No retained backup and no app restart. Active windows continue running the previous process until user restarts.
+
+## 2026-10-09 — 0.18.9 (164): automatic task context and recovery
+
+- Execution tasks collect permission-allowed UTF-8 excerpts from task-named files, paths in recent observations confined to the current directory, and a small fixed set of project summaries for code/script goals. At most 8 candidates, 4 KB per file, approximately 12 KB total; no recursive scan, sensitive paths excluded, symlink traversal rejected (verified standard macOS root aliases allowed), secrets redacted. Missing/large/nontext files are optional; context excerpts are untrusted and do not count as acceptance evidence. Pure conversation does not automatically read files. Related-file sources and excerpts are visible in an expandable UI.
+- Persist an application-owned checkpoint before submitting each operation and before sending a PTY command. A persistence failure prevents submission. Checkpoints retain original goal/channel, operations and execution IDs. Native Codex transient transport failures retry at most twice with recorded actual results and current authorized terminal observations; no automatic tool replay. API providers keep their existing bounded transport retry.
+- Failed/interrupted/blocked/limited histories provide Check progress and continue. Original target/host and channel are pinned; prior checks require fresh observations. A known running PTY command is followed by ID, never re-submitted. Unknown/disconnected submission outcomes remain uncertain; recovery permits read-only checks but blocks further mutations when uncertainty cannot be resolved. Recorded identical mutations are not replayed. Legacy histories reconstruct conservative checkpoints from existing steps.
+- Fixed same-target prepare() closing the persistent model process during ordinary context refresh; new target, cancellation and new conversation still close it.
+- Targeted recovery tests passed: native protocol transport loss with no duplicated tool, journal reload and unchanged original goal, wrong-target rejection, uncertain operation checkpoint written before effect, real owned Bash PTY command recovery by ID (file contains exactly one append), and NSHostingView resume-button click. No user server was used. /tmp/axon-0189-terminal-recovery.log.
+- Opened/inspected /tmp/axon-0189-ui/recovery-{320,600}.png and related-open-600.png; narrow/normal layout, source expansion and resume click passed. Earlier context ancestor filtering rejected standard /var alias; corrected with verified local root aliases and reran. Initial broad regression exposed the existing raw-PTY CR translation fixture; source its hook using LF consistently, pending final rerun below.
+- Final AI/terminal/file/permissions/history regression: 112 tests, 3 opt-in model tests skipped, zero failures (115.941s, /tmp/axon-0189-regression-final.log). Separately executed actual authenticated Codex/current owned PTY hello-world creation/run/acceptance: passed, 42.262s (/tmp/axon-0189-real.log). Additional journal-persistence-failure test passed: zero mutation submissions (/tmp/axon-0189-save-failure.log). git diff --check passed.
+- Release build completed (95.61s), strict codesign and ZIP integrity passed. Installed /Applications/Axon.app 0.18.9 (164), source/staged/installed executable hashes matched: 095a7b019f9bde7d29d9f3340269cf00cb1010fd5392e9090fc16a1f0d09f50d. ZIP SHA-256: 807e33d1e8908906b6a911b6e322287c4dfbd31e43c6c896f4741200d1f801ae. Receipt native/dist/installation-0.18.9.txt. No retained backup or restart, as authorized; existing windows load the new version only after user restarts.
+
+## 2026-10-09 — 0.19.0 (165): project context, provider continuity and file-aware recovery
+
+- Kept existing command/conversation presentation. Added bounded project retrieval on the pinned file endpoint: permission-allowed directory enumeration, maximum depth 3 / 400 entries, ranking by task/path and bounded content matches, maximum 12 excerpts / 4 KB each / approximately 24 KB total. Respect root .gitignore, .axonignore and .warpindexingignore (conservative wildcard exclusions; negations never reinclude excluded files), skip secrets/generated directories/symlinks, redact content, and recheck metadata. This is lexical retrieval, not embedding-based repository indexing; no remote repository upload, persistent index or new MCP/cloud integration. Optional unavailable context does not block execution. Pure chat retains its existing supplied-context-only behavior.
+- Claude and ChatGPT API execution now retain native assistant tool calls with actual provider IDs and matching tool-result messages, bounded complete call/result pairs and pinned task/check feedback. Failed/incomplete streamed actions never enter history or execute. Codex retains its native app-server thread. API retry fixtures now return realistic call IDs and assert exact matching result IDs; no live external API account was required.
+- Added replace_files for up to 8 distinct files using the existing exact replacement/diff interface. Permission is checked per file as well as per group; deny remains authoritative. Review all diffs together, recheck originals for the entire group after approval and before writing, preserve existing backup/conflict/byte verification. Multi-file writes are not atomic: partial application is explicitly reported and checkpointed rather than blindly replayed.
+- File-edit submissions persist SHA-256 of original/proposed bytes before effect. Resume inspects fresh permission-allowed bytes: expected after-content means completed; wholly unchanged uncertain submissions may be reproposed with normal approval; unexpected or partially applied groups remain uncertain and block further mutations. Generic shell mutation outcomes cannot be inferred from file hashes and remain conservative. Original target/channel, execution-ID recovery and frozen goal checks remain in force.
+- Native combined-diff approval/apply buttons clicked and post-edit checks passed in NSHostingView. Opened and visually inspected /tmp/axon-0190-ui/project-approval-320.png, project-combined-diff.png and project-verified.png; existing controls, wrapping and scroll area usable at 320/600pt. Related-source and resume rendering/interaction also covered by existing tests. No user SSH server was used.
+- Initial regression failures: older synthetic API fixtures omitted call IDs and assumed text-only user feedback; updated them to real native tool-call/result envelopes. Existing raw-PTY fixture intermittently failed hook readiness in the first broad run; isolated repeat passed. Targeted protocol/project/native UI/PTY rerun: 7 tests, zero failures (/tmp/axon-0190-targeted.log). Final regression/build/install results are recorded below when complete.
+- Final broad AI/terminal/permissions regression: 98 tests, 3 opt-in model tests skipped, zero failures (101.030s, /tmp/axon-0190-regression-final.log). Later bounded-history/call-ID audit and reconnect-fresh-check refinements are covered in the final targeted/real-model run below.
+- Final targeted run after continuity/audit/reconnect refinements: 17 tests, zero failures (67.367s, /tmp/axon-0190-real-final.log), including actual authenticated Codex + isolated current Bash PTY hello-world creation/execution/acceptance (45.522s). Targeted project/path canonicalization/group-and-per-file deny/log-origin/history/owned SSH file regression: 22 tests, zero failures (6.568s, /tmp/axon-0190-delivery-check.log). No application UI redesign or user-server operation was performed. git diff --check passed.
+- Release build succeeded (98.79s, /tmp/axon-0190-package.log); strict codesign and ZIP integrity passed. Installed /Applications/Axon.app 0.19.0 (165), source/staged/installed executable hashes matched: 73247eb31b53ba984ea932fab0ba124cd444a73906a7fd1861ef3fc1714811fe. ZIP SHA-256: 5d4c322225a26dcb24e11ea5efed34f30f22baefb3c59ae215144ac961f8d16a. Receipt native/dist/installation-0.19.0.txt; install log /tmp/axon-0190-install.log. No retained old-app backup, no force quit and no restart. Existing running application loads the new version only after user restarts.
+
+## 0.19.1 (166) — bounded project retrieval and recovery freshness
+
+- Project context scans up to 96 small files / 512 KiB within the existing bounded directory traversal, with permissions, ignored directories, sensitive-file exclusions and symlink guards. Retrieval searches complete files up to 64 KiB and returns bounded line-numbered windows around identifiers/ports, plus lightweight filename-reference association. This is lexical retrieval, not semantic/vector indexing.
+- Selected context files are reread with before/after metadata checks immediately before preparing excerpts. Model reconnect refreshes related files; original goal and frozen acceptance checks remain in force.
+- Multi-file edits now recheck target validity and live per-file deny policy before each write. A denied remaining file pauses the group and retains checkpoints; already-written files are not silently undone or replayed.
+- Regression `/tmp/axon-0191-final-tests.log`: 44 tests, 1 skipped; five assertions failed within the same real-PTY shell-readiness test. Context, recovery, project edit, policy and native UI tests passed. The isolated terminal recheck is recorded separately below.
+- Native UI tests clicked context expansion/resume and group diff approval/apply. Inspected `/tmp/axon-0189-ui/related-open-600.png`, `/tmp/axon-0190-ui/project-approval-320.png` and `/tmp/axon-0190-ui/project-combined-diff.png`. Existing command/chat layout retained.
+- Isolated real-terminal recheck `/tmp/axon-0191-terminal-recheck.log`: 1 test, 0 failures, 8.088s; shell/REPL/database/full-screen path passed.
+- Release build completed in 102.64s (`/tmp/axon-0191-package.log`); strict deep codesign and ZIP integrity passed.
+- Installed 0.19.1 (166) at `/Applications/Axon.app`, source/staging/installed identity verified by install-current.py. No old-version backup retained, no application restart or user SSH interruption (`/tmp/axon-0191-install.log`). ZIP SHA-256 `fe2d036c7042c37a60eb01cc9daadea1b03adb07a6c421d5e74be65b188121ed`. User must restart Axon to load the installed build.
+- Scope: no MCP/cloud integration or semantic repository index added in this increment; partial file-group uncertainty still requires fresh checkpoint inspection rather than automatic replay.
+
+## 2026-10-09 — 0.19.2 (167): local agent interaction alignment
+
+- Existing command/conversation presentation retained. Added bounded prompt queue (edit, reorder, remove, pause/resume), safe-boundary task steering with stale model decisions discarded before effects, clarification choices/free text/skip, advisory plan revisions/adoption, permission-checked root-to-cwd AXON.md/AGENTS.md guidance, global instructions and named agent presets. Plans/questions never grant command permission; immutable deny and editor prohibition remain authoritative.
+- Final focused regression: 56 tests, 1 opt-in authenticated model smoke skipped, 0 failures (43.552s, /tmp/axon-0192-validated.log). Final target-change/context and steering-guidance boundary refinements: 13 tests, 0 failures (/tmp/axon-0192-boundary-tests.log). No live user SSH or live provider end-to-end test in this increment. Initial UI fixture timing failures were corrected by waiting for SwiftUI disabled-state updates; final runs passed.
+- Actual NSHostingView screenshots inspected at 320/600pt: clarification choices, editable plan, busy composer, expanded queue, settings and long-name profile menu. Native answer, queue and steer buttons clicked; queue edits/reordering also covered by logic tests. Narrow follow-output control changed to a compact icon to avoid wrapping. Evidence retained in native/dist/ui-0.19.2/.
+- Final release built in 98.21s (/tmp/axon-0192-package-final.log). Installer checked strict codesign, ZIP integrity, version/build and staged/installed executable identity. Installed /Applications/Axon.app 0.19.2 (167), no retained backup, no launch/restart or user connection interruption (/tmp/axon-0192-install.log). ZIP SHA-256: 8521a9a73b18901f6a8bff4606ca13114044e35c186ee383fd92c0981ba5bedc. Existing running process requires user restart to load this build.
+- Full Warp parity is NOT complete. AXON-WARP-COMPARISON.md retains fixed IDs and remaining partial/missing items: semantic indexing, Skills, MCP, web/multimodal, Git review, concurrent agents/conversations, routing/usage/cloud capabilities and outstanding generic execution reliability. Cloud deployment choice remains unanswered; no cloud deployment was attempted.
+
+## 2026-10-09 — 0.19.3 (168): conversation branching
+
+- Conversation history now offers Fork with a native turn selector and preview. A branch inherits only the selected historical turns, persists a parent ID/turn boundary and independently saves future messages. Original target constraints remain; no model request/command is sent merely by branching. No approvals, checkpoints, verification results or live command ownership transfer. Deleting the parent leaves the branch accessible. Legacy summary-only histories disable branching. Existing command/conversation presentation and history storage limits remain.
+- Regression /tmp/axon-0193-regression.log: 43 tests, zero failures (25.342s), covering conversation interaction, queue/steering, native model transport pairing, context/recovery and permission boundaries. Added real history-to-fork nested-sheet path and keyboard selection; final /tmp/axon-0193-route.log: 5 tests, zero failures (3.207s). Initial new-test compile error referenced private state; corrected assertions to inspect the persisted branch, then reran. No live provider or user SSH server was used.
+- Actual native screenshots opened/inspected: conversation-320.png, conversation-600.png, history.png, fork-route.png, fork.png, fork-menu.png and fork-first-turn.png in /tmp/axon-0193-ui. Real history/fork/create buttons clicked, native dropdown opened and Up/Return selected an earlier turn; earlier preview updates and independent branch creation verified. Evidence copied to native/dist/ui-0.19.3/.
+- Comparison CV06 updated to basic existing, with legacy/storage restrictions explicit. Complete Warp alignment remains unfinished; remaining IDs are not marked complete. Build/install results follow.
+- Final release completed in 101.20s (/tmp/axon-0193-package.log), strict codesign and ZIP integrity verified. Installed /Applications/Axon.app 0.19.3 (168), source/stage/installed identity checked by install-current.py. ZIP SHA-256 d95d0b0fa74c0c206c3708c263a4416aa8e27079a91cd751f61099c5eb7fecef. Receipt native/dist/installation-0.19.3.txt; no retained old-version backup and no app launch/restart. Running windows load the new version after user restart. git diff --check passed.
+
+## 2026-10-09 — 0.19.4 (169): workflow Skills discovery and progressive loading
+
+- Added permission-allowed project/root-to-current-directory SKILL.md discovery, compatible skill directories, local-home global sources and up to 8 configured absolute additional roots on the pinned endpoint. YAML name/description metadata enters the bounded catalog first; read_skill loads fresh full instructions only when chosen. At most 32 skills / 96 candidate subdirectories, 4 KiB metadata read, 16 KiB per full skill, 24 KiB loaded content per task. Duplicate names keep distinct absolute paths. Symlinks (apart from verified standard local root aliases), sensitive paths, unavailable/changed files are rejected. Loaded instructions never grant execution permission or bypass built-in deny; relative resources continue using existing checked tools.
+- Skills setting/root paths included in named profiles, optional fields preserve legacy settings. Pure chat does not gain automatic file access. Discovery follows allowed read_file/list_directory permissions; approval-required discovery is skipped, never silently granted. The source/loaded list expands and collapses in the existing context area. No command/conversation presentation redesign.
+- Regression /tmp/axon-0194-regression.log: 45 tests, zero failures (28.220s). Later live-policy-after-load guard and actual model-requested rm denial regression /tmp/axon-0194-final.log: 16 tests, 1 opt-in authenticated model smoke skipped, zero failures (12.417s). Final layout /tmp/axon-0194-layout-final.log: 5 tests, zero failures (1.632s). No live provider or user SSH test.
+- Initial UI test selected a static-text node sharing the disclosure identifier after expansion; adjusted fixture to select AXDisclosureTriangle, then real expansion/collapse and screenshots passed at 320/600pt. Inspected skills-{320,600}.png, skills-closed-320.png and actual updated settings screenshot. Wide content alignment refined and inspected again. Final Unicode boundary/build/install outcome follows.
+- PL06 remains partial: no slash-command selector, argument placeholder substitution, install/edit skill manager or cloud skill distribution. Full Warp parity is not claimed.
+- Final Unicode boundary refinement: metadata decoding tolerates only an incomplete UTF-8 tail after the complete YAML header; malformed header descriptions are rejected, full instructions remain strict UTF-8. Regression /tmp/axon-0194-unicode.log: 6 tests, zero failures (1.777s), including a 9 KB Chinese body with a byte-truncated discovery excerpt. Final package is regenerated after this source refinement; the earlier package is not installed.
+- Final release built in 96.92s (/tmp/axon-0194-package-final.log). Installer verified strict codesign, ZIP integrity, version/build and executable identity. Installed /Applications/Axon.app 0.19.4 (169); receipt native/dist/installation-0.19.4.txt. ZIP SHA-256 579f30a016a6ff2564278749a99462ce01c32ffd540828ead893fae28541e294. No retained backup, no launch/restart or user connection interruption. User restart is needed to load the new binary. git diff --check passed.
+
+## 2026-10-09 — 0.19.5（170）成熟 Agent 原生工具接入
+
+- Codex app-server 从总入口 axon_step 切换到独立 axon_<operation> 动态工具；模型直接调用对应工具并等待同一 call ID 的实际结果。适配回原权限/文件/PTY 执行器，不复制 Warp 源码、不放开内置 shell/MCP、不可调整 deny 和脚本检查仍在。Claude/ChatGPT API 路径未切换。
+- 格式错误保留 pending 调用及 Agent 线程，回传校验拒绝后继续；未知工具/重复 call ID 被拒绝，未授权操作不得执行。
+- 回归：40 个测试，1 个 opt-in 实际模型测试在普通回归中跳过，0 失败，23.588 秒；包括原生工具进程、多轮会话、格式修正、deny、断线不重复执行、PTY 脚本及命令证据、脚本检查与会话 UI。日志 native/dist/ui-0.19.5/axon-native-agent-regression-final.log。首次回归发现格式错误会关闭会话，修复后上述回归通过。
+- 单独 opt-in 真实 Codex + 隔离本机 Bash PTY 测试：1 个通过、0 失败，31.573 秒；模型创建 test.sh、读内容、实际执行得到 hello world、应用 verification.pending=false，操作有模型 call ID；不访问用户服务器。日志 native/dist/ui-0.19.5/axon-native-agent-live.log。实际模型测试在格式修正 catch 修复前通过；该修复随后由协议回归复验，不改变成功路径。
+- 实际 NSHostingView 渲染：320/600pt 统一回复和执行过程展开/收起；已打开观察 unified-320.png 与 actions-open-600.png，布局/滚动/操作区域正常。交互由原生 UI 测试实际点击和键盘验证，截图保存 native/dist/ui-0.19.5/。
+- git diff --check 通过。仍未进行用户 Linux SSH 实测或真实模型服务断网注入；不以此版本宣称 Warp 全面等价。
+- release 构建通过（99.76 秒），严格 codesign 与 ZIP 完整性校验通过。已安装 /Applications/Axon.app 为 0.19.5（170），安装前后程序哈希核对一致；未保留备份、未启动或重启应用，当前运行进程需用户主动重启后加载新版。安装凭据 native/dist/installation-0.19.5.txt，ZIP SHA-256: 7a2f56c8e9232bb51339835fb50556feb2a45273fe4deb20c5f2015f5b63c75e。
+
+## 2026-10-09 — 0.19.6（171）保留原 Agent 并可选
+
+- AISettings 可选 agentRuntime：缺省/nil 为 Axon 原有任务协议，codexNative 为独立原生工具。恢复原 axon_step 动态工具及原指导语；新旧均复用现有权限、验证、上下文、Skills、恢复和固定执行端点。仅 Codex CLI 显示该选择；API 后端保持原有能力。任务使用捕获的配置，运行中下拉禁用；保存后下次任务生效。
+- 代理预设保存/应用该选择；缺少字段的旧设置与旧预设继续原方式。不编辑用户设置文件，不迁移为新方式。
+- 25 个相关测试通过（0 失败，10.482 秒）；覆盖两种工具注册/调用/结果回传、多轮继续、断线恢复、格式修正、deny、配置兼容及保存、Skills。随后补充完整设置页截图并复验 4 个配置/渲染测试（0 失败，1.950 秒）。真实模型/用户服务器未在此增量重跑；上版原生 Codex 真实临时 PTY 测试已记录。
+- 实际 NSHostingView 设置页 820pt 与局部选择 320/600pt，下拉展开、方向键/Return 选择、默认/新选项、禁用无法打开、持久化已验证。已打开观察 settings.png、runtime-menu-320.png、runtime-320.png、native-600.png、disabled.png。截图/测试日志 native/dist/ui-0.19.6/。
+- release 构建通过（100.62 秒），严格 codesign 与 ZIP 完整性校验通过；已安装 /Applications/Axon.app 为 0.19.6（171），安装前后程序哈希一致，无保留备份、无重启。安装凭据 native/dist/installation-0.19.6.txt；ZIP SHA-256: 4eb63dffdcd2d889fb5175f674c03822f621030a79326b44e6a450fbf12dd5ec。git diff --check 通过。
+
+## 0.19.7 (172) — 原有 Axon Agent 检索与停滞保护（2026-10-09）
+
+- 保留原有 Agent 默认、Codex 原生工具可选及现有命令/对话展示；按本仓库 axon-dev-delivery skill 实施。用户已授权本机安装、不备份旧版、不自动重启。
+- 新增 read_file_range / search_files；绑定文件连接而非额外 Shell，范围、大小、敏感路径、祖先符号链接、权限检查与读取期间 metadata 一致性约束。检索继承现有 read_file/list_directory 权限与 ignore 规则，明确有界词法片段，不能替代语义索引或完整 grep。
+- 指引精确读取当前目录一级，32 KiB 单文件、64 KiB 初始总量；直接文件修改前动态读取子目录规则并重新决策，32 个新目录、128 KiB 累计规则上限阻止继续编辑。Shell 写入不算动态作用域已覆盖。
+- 重复不变结果/拒绝/未验收即结束达到 4 次暂停；保留会话和执行记录。正在运行命令与 result/wait 轮询不计停滞，人工引导、修改、同一读取的新结果重置保护。
+- 最终定向交付回归：52 tests，2 opt-in skipped，0 failures（36.649s），/tmp/axon-0197-delivery-tests.log。覆盖实际命令 ID 关联、长命令及人工干预、权限、恢复、子目录指引、项目编辑、模型修复、会话与 UI 展开/收起。未将跳过项算通过。
+- 独立启用真实 Codex 原有 Axon Agent：1 test，0 failures（44.986s），/tmp/axon-0197-live-agent.log。在隔离本机 Bash PTY 创建 test.sh、执行 hello world、核对目录/输出/退出码/文件/目标验收，不访问用户服务器。
+- 初次广泛 AI 回归失败：交互 PTY 与后续终端测试出现时序失败，取消测试夹具因强解 nil 崩溃；不宣称全量通过。隔离重跑 6 个 AITerminalOperationTests 全部通过。交互夹具恢复 stty sane 后以 Return（替代 Ctrl+J）安装 hook 修正；该完整 Shell/REPL/SQLite/全屏测试独立通过（8.024s），/tmp/axon-0197-interactive-final.log。广泛单进程串行 PTY 的稳定性继续列为 RC08 缺口。
+- 原生 NSHostingView 渲染已亲自打开检查 320/600pt 停滞状态及执行过程展开截图；操作历史按钮展开/收起回归通过。截图 native/dist/ui-0.19.7/，沿用现有配色、气泡与输入区。
+- Release 构建完成（99.85s），严格 codesign 校验与 ZIP 完整性通过；已安装 /Applications/Axon.app 0.19.7 (172)，未保留旧版备份、未启动/重启应用。用户主动重启后才加载新版。
+- ZIP：native/dist/Axon-0.19.7-mac-arm64.zip；SHA-256 cf68530c1985eb183da0282c8e3b9a3401a827ca281cff973289a9eb97c617a1。安装回执 native/dist/installation-0.19.7.txt；构建/安装日志 /tmp/axon-0197-package.log、/tmp/axon-0197-install.log。git diff --check 通过。
+
+## 0.19.8 (173) — 原有 Agent 精确文本搜索（2026-10-09）
+
+- 按 axon-dev-delivery 实施；保留原有 Agent 默认、可选原生工具、固定文件/SSH 端点及现有对话/命令布局。新增 search_text 字面查询、大小写选项、路径与一基行号、目标/范围绑定分页；搜索期间重新扫描规则及 metadata，变化时不返回本页旧匹配。按需范围继续受权限、永久 deny、符号链接、敏感/生成目录约束。不是语义索引或验收证据。
+- 自动片段和字面搜索使用逐级 ignore，支持锚定、目录、通配符、globstar、否定与父目录排除。单个 ignore 8 KiB、总量 64 KiB；规则文件已经存在但不能安全读取时跳过子树。代表性模式与真实 git check-ignore 对照一致。父规则仅在最多 8 层内找到仓库时继承；Git 全局 excludes/index 语义、显式文件引用的 ignore 限制未完成。
+- 每次扫描 1000 项/80 目录/深度 8/400 文件（单文件最多 1 MiB），每页读取最多 2 MiB，最多 100 条匹配、约 12 KiB 匹配输出。非 UTF-8/二进制跳过，一行只记一次。范围有界，不将结果当作完整目录快照或不存在证明。
+- 搜索步骤保留真实 tool 与参数，不再误记为 list_directory；审批仍继承目录/文件权限并检查搜索工具自身 deny。界面隐藏模型游标，只呈现匹配、路径、行号及限制说明；不会把分页游标当执行权。
+- 定向回归 54 tests、1 opt-in skipped、0 failures（27.574s）；覆盖项目读取/编辑、忽略规则、上下文与恢复、权限、停滞保护、原有及原生工具方式、配置与 Skills。新增不可读规则/权限变化测试后搜索套件复验 8 tests、1 skipped、0 failures（4.393s）。未宣称全量测试通过。
+- 单独启用真实 Codex 原有 Axon Agent：1 test、0 failures（40.325s）。模型在隔离本机文件目录使用 search_text，limit=1，连续翻页取到全部 3 行并总结，文件未被修改。初始 OS 观察用夹具，搜索读取用真实 LocalFiles；没有访问用户服务器、未实测远端 SFTP 性能或真实网络故障。
+- 原生 NSHostingView 320/600pt，真实无障碍点击执行过程与搜索结果展开/收起，8 张截图；已亲自打开最终搜索输出与收起截图检查，路径/长行可换行、输出可滚动，输入区保持可达。截图与日志 native/dist/ui-0.19.8/。
+- 初次新增测试夹具有配置赋值、搜索范围含自更新日志及原生控件命中问题，已修正隔离目录与真实可访问按钮目标并复验；未以失败结果冒充通过。
+- Release 构建通过（104.89s），严格 codesign 与 ZIP 完整性检查通过；已安装 /Applications/Axon.app 0.19.8 (173)，安装前后程序 SHA-256 一致。未保留备份、未启动或重启应用；现有进程/会话保留，用户主动重启后加载新版。
+- ZIP：native/dist/Axon-0.19.8-mac-arm64.zip；SHA-256 811847eb490158606b17818546ee524cad94584aa7045ce29f329c3576e13a18。安装回执 native/dist/installation-0.19.8.txt；构建和安装日志已复制到 native/dist/ui-0.19.8/。git diff --check 通过。
+
+## 0.19.9 (174) — 决策、执行与终端控制（2026-10-09）
+
+- 完成比较表第 1 组 EX01–EX08 的连接内工作流；保留原有 Axon Agent 默认、原生工具方式可选、现有命令/对话布局及 Vim 禁用。持续按真实工具结果逐步决策，审批时暂停。
+- 输入租约在实际 PTY 写入前复验；人工输入撤销租约并取消模型决策，明确交回后恢复原会话。读取先等待已排队人工输入，按键同时检查输入版本与当前执行 ID，防止过期操作进入新的程序或 Shell。
+- 命令 UUID 与 Shell 开始/结束序号配对，旧结束、异常时长、被替代命令不能作为完成证据。修复 Bash 子 Shell/相同历史命令配对及 macOS canonical PTY 单行长度限制；不覆盖已有第三方 DEBUG trap，不明确状态时拒绝自动输入。
+- 运行程序列表可定位终端、查看状态/输出、继续原会话。停止 AI 和中断程序分开；中断仅对仍匹配的 AI 前台程序发送 Ctrl-C，实际退出单独确认。terminal_detach 保留原连接程序并暂停未完成目标，不将其验收为成功；不提供脱离连接的守护或跨重启所有权。
+- terminal_input 原子提交一条可检查的程序输入；Python 隔离启动仅允许精确 python3 -I -S -q，禁止管道/重定向/额外脚本绕过。program_result 是验收条件而非执行工具，只匹配本次真实完成回执、退出码 0 及完整输出行；输入回显或 PTY 写入成功不能通过。
+- 最终定向回归 39 tests、1 opt-in skipped、0 failures（46.425s），/tmp/axon-0199-delivery-tests.log；最新终端初始化/命令历史回归 13 tests、0 failures（1.921s），/tmp/axon-0199-bootstrap-final.log。真实 Python、SQLite、全屏程序运输回归此前独立通过；未将用户 SSH 服务器或任意交互客户端算作已验证。
+- 原生 NSHostingView 程序列表 320/600pt、人工控制条 320pt 已亲自打开观察；真实无障碍点击定位终端、接管/交回、禁用态与模型取消验证通过。截图 native/dist/ui-0.19.9/programs-320.png、programs-600.png、handoff-human-320.png。
+- 最终源码启用认证真实模型：原生工具方式 39.029s、原有 Axon Agent 47.243s，两项均通过（总计 86.272s）。在隔离本机 Bash PTY 创建 test.sh、真实执行 hello world，核对目录、文件、关联输出/退出码与验收完成；没有额外独立 Shell 执行通道或用户服务器操作。日志 /tmp/axon-0199-live-final.log。
+- 最终 release 构建通过（110.94s），严格 codesign 与 ZIP 完整性校验通过。已安装 /Applications/Axon.app 0.19.9 (174)，安装前后程序哈希一致；按用户要求未保留旧版备份、未启动或重启应用，现有连接保持。用户主动重启后加载新版。安装回执 native/dist/installation-0.19.9.txt；构建/安装日志已存入 native/dist/ui-0.19.9/。
+- ZIP：native/dist/Axon-0.19.9-mac-arm64.zip；SHA-256 e12ab87b6f17728ecc09b44456d92f6aab4ef7ba7ea8619766c614b4a8147488。git diff --check 通过。
+
+## 0.19.10 (175) — 设置自动生效（2026-10-09）
+
+- 通用、终端、终端配色选择、关键词规则、键盘与剪贴板、连接及快捷键设置修改后自动校验、保存与应用，移除设置页保存/撤销按钮及已退役的保存设置快捷键入口。保存失败显示原因并可重试；无效数值或冲突快捷键保留输入和上一份有效配置。自动保存不重建当前输入控件，避免丢失焦点。
+- AI 设置采用 350ms 合并输入的自动保存，离开页面刷新待保存内容；API Key 继续保存在钥匙串。切换服务前按原服务处理待写入密钥。恢复 CLI 默认模型同时恢复默认强度与速度，避免保存无法通过校验的组合。连接参数仍在下一次连接应用，AI 设置用于后续任务。
+- S3 连接沿用自动保存，移除重复的保存连接按钮；自动备份目标、共享密码与携带凭据选项有效时自动保存。缺少密码或目标不可用时保留已保存配置；更改策略不触发上传或备份。新建命名配色方案、代理预设以及备份/恢复仍是明确操作。
+- 工作区原有 AI 源码的三处编译阻塞做最小修复：纯 SHA256 方法标记 nonisolated、初始化路径映射使用已初始化局部根路径、允许现有网页工具复用无重定向策略；保留其余已有改动。
+- 设置/快捷键/自动备份/AI/图标/密码/终端字体/配色编辑回归 49 tests、1 opt-in skipped、0 failures（44.515s）；最后小修正后设置/快捷键/自动备份等回归 32 tests、0 failures（17.438s）。跳过项为需显式授权登录调用的真实 Codex 联网测试。没有访问用户服务器。
+- 已亲自观察真实 NSHostingView/AppKit 截图：通用、快捷键、云备份 650pt；终端及完整 AI 设置工作台 1050/1400pt；检查底部自动生效提示、已选/未选图标、滚动与主要动作。真实键盘录入快捷键、图标无障碍切换、字号增减/无效输入修正、备份共享字段与禁用操作均通过。终端应用测试核对已打开终端字体与落盘文件；NSHostingView 字体预览部分截图呈空白，不将截图当作终端像素显示验证。截图与测试日志：native/dist/ui-0.19.10/。
+- Release 构建通过（119.26s），版本 0.19.10 / build 175。严格 codesign 校验在拥有系统证书访问的环境通过；受限沙箱复验曾报 CSSMERR_TP_NOT_TRUSTED，已在沙箱外重新核验成功。ZIP 完整性检查通过；SHA-256：2b8450dad75ee0aa3a9acd3ae18569d6f22f4ad88dca329173e5ad2d92a9fc83。发布包 native/dist/Axon-0.19.10-mac-arm64.zip。
+- 本次未安装、未启动或重启新版应用；运行中的连接保持。源码与发布包完成，不将运行中的旧版本说成已加载本次修改。git diff --check 通过。
+
+## 0.19.11 (176) — 上下文与项目理解（2026-10-09）
+
+- 新增目标隔离的持久项目索引、增量同步/重建、删除和内容变化失效、多项目/worktree、@ 文件/目录/符号/行范围引用。发送和空闲面板同步均走原文件连接，不执行额外 Shell 或创建远端隐藏文件。关键词与本机 Apple 英文句向量混合排名；索引有限且并非代码专用 embedding。缓存仅供检索，模型使用前重读、核对摘要、权限与当前排除规则。
+- 当前上下文继续受原终端/日志限制；项目相关片段、来源清单加入模型请求及有界工作记忆。明确引用文件最多 1 MiB/200 行，索引文件 256 KiB/前 8 片段，每次同步 20,000 项/深度 24/5,000 文件/2,000 片段/32 MiB 变更，整个本机 JSON 48 MiB，权限目录 700/文件 600；达到上限明确标为部分。
+- Java / Spring Boot 加入跳过注释/字符串的平衡方法体词法结构、方法位置、候选调用和 Spring 映射字面值；Maven XML 安全解析声明依赖并拒绝 DOCTYPE/实体。未运行 Maven/Gradle 或用户代码，继承版本与属性仍未解析，本机没有 JDK，因此尚无编译器 AST/类型调用图。路由不是实际运行端点证明。
+- 本机 Git index/info/global excludes 与嵌套 ignore 接入，明确引用也重新检查过滤；远端 Git 元数据未接入。不宣称任意第三方写入或读取竞争得到绝对原子保证。新会话及目标切换清空附件，项目索引按目标身份和根目录分离；图片不持久保存到聊天历史。
+- 图片 PNG/JPEG/WebP 重编码到 PNG、最多 4 张/12 MiB，传给 Codex 与 API 多模态请求；Claude/OpenAI 请求结构本地测试通过。公开网页读取有大小/时长/跳转上限，不携带登录 Cookie；Bing RSS 搜索返回来源，页面内容作为不可信上下文。网页工具经过原 Agent 权限链路，不转换为终端命令。
+- 定向回归 55 tests、4 skipped、0 failures（42.954s）；新 Maven 和完整 AI 工作台最后复验 18 tests、2 skipped、0 failures（8.476s）。跳过的是 opt-in 外部模型/网页与其他真实运行测试。本地测试核对不执行 Shell、内容传给模型、语义无关键词匹配、跨目标隔离、忽略更新、引用行号及脱敏、缓存内容失效、Maven 外部实体拒绝。第一次语义阈值和中文 URL 标点测试失败后已修正并复验；首次 UI 单测未启用 accessibility 导致同步按钮无法点击，已在测试初始化修复并复验。Maven 首次 FoundationXML 导入在 macOS 不可用，改用 Foundation XMLParser 后复验通过。
+- 亲自观察 NSHostingView 上下文面板 320/600pt 顶部及滚动底部、完整 AI 工作台 1050/1400pt；真实 accessibility 点击同步及移除引用通过，查看原生尺寸、长路径、禁用态、滚动、图片与 URL 入口。截图与日志 native/dist/ui-0.19.11/。没有在用户服务器执行验证命令。
+- 本轮外部复验曾被自动审批拒绝，说明原因后用户明确授权生成的数字图片发送当前 Codex 与公开网页读取/搜索；将在最终记录下方补记结果。
+- 用户授权后的最后外部复验 2 tests、0 failures（12.232s）：生成的 4827 图片由实际 Codex 多模态请求识别；Swift.org 公开网页读取及 Bing RSS 搜索返回来源通过。未发送用户项目文件。自动审批此前的阻塞已由明确授权后复验解决。日志 native/dist/ui-0.19.11/axon-context-live-final.log。
+- Release 构建通过（118.35s）；严格 codesign 校验、ZIP 完整性及 plist 版本 0.19.11/build 176 核对通过。已安装 /Applications/Axon.app 0.19.11（176），安装前后程序哈希一致，保留用户白色图标选择；未保留旧版备份、未启动/重启应用。现有连接继续运行旧进程，用户主动重启后加载新版。安装回执 native/dist/installation-0.19.11.txt。
+- ZIP native/dist/Axon-0.19.11-mac-arm64.zip，SHA-256：41608a538c0a691e504e5222ed0d00b9de6af9f42c319c4ecbd701056852a4a6。git diff --check 通过。高级 Java 类型/继承调用图、专用代码向量、超出上限的大项目、远端 Git 元数据、登录/动态网页仍是明确剩余差距，不能称为全部 Warp 等价。
+
+## 0.19.12 (177) — 登录后提示符重复（2026-10-09）
+
+- 原因：命令历史初始化借用 alternate screen，ready 回执恢复普通缓冲区后，原来的 PS1 留在当前行，Shell 随后输出新 PS1，形成同一行两份提示符。恢复普通缓冲区时回到行首并清除旧提示符所在行，让 Shell 重绘单份提示符；保留上方登录欢迎信息。
+- 命令历史与输入来源回归 17 tests、0 failures（5.056s）；真实本机 Bash 自动初始化、命令记录与来源归属通过。扩展恢复画面测试核对 LOGIN_STAYS_VISIBLE 保留、初始化文本不进入普通缓冲区、提示符精确出现一次。没有操作用户 SSH 服务器。
+- 已尝试并亲自打开真实 AppKit TerminalView 截图；Metal、CoreGraphics 与窗口截图都未正常呈现终端文字（空白），所以本次没有完成最终像素级视觉验收，不能将缓冲区断言等同于实际画面验收。失败截图与尝试日志保存在 native/dist/ui-0.19.12/。
+- Release 构建通过（112.38s），严格 codesign、ZIP 完整性检查通过。版本 0.19.12 / build 177；ZIP native/dist/Axon-0.19.12-mac-arm64.zip；SHA-256 f44fc285dbfa8d8364fa5e4fdf69a57f238fa7b9475ad486f973d26797c74500。未安装、未启动或重启新版应用，现有会话保留。git diff --check 通过。
+
+
+## 0.19.13 (178) — 会话与运行中协作（2026-10-09）
+
+- 源码：独立 AIAssistant 实例及任务日志；最多 20 会话，同终端执行互斥；运行中切换不取消原任务，人工接管按目标停止后台代理。独立场景窗口使用独立日志/收件箱目录，避免同一文件并发覆盖；共享系统通知路由根据收件箱和稳定会话 ID 定位窗口。
+- 运行中纠正：执行任务沿用安全节点和过时动作丢弃；纯对话取消旧生成并结合追加指令重新请求，保留队列。队列继续时保留原上下文读取端点。设置保存会同步同一工作台的其他会话，批准仍各自隔离。
+- 澄清：兼容旧 ask_user，支持 1–3 题、单选/多选和自由回答，所有问题统一提交。已通过真实 AppKit/SwiftUI 选项与提交按钮将两题答案传回代理，未生成执行权限。
+- 收件箱：最近 100 条有界持久事件、已读/清理、打开原会话。系统通知默认关闭；仅主动启用请求授权；通知正文没有提问/命令/输出。真实系统授权弹窗、横幅及通知点击回调未实际验收，CV07 保留部分。
+- 语音：macOS Speech/AVFoundation 本机中英文听写，插入草稿/放弃，离开页面停止，无自动发送。权限拒绝和等待授权期间取消通过可控权限依赖验证，没有触发真实录音。真实麦克风、系统授权和语音资源识别未验收，CV08 保留部分；未实现朗读或语音通话。
+- 最终关联测试：AIInteractionTests、AISessionCollaborationTests、AIConversationForkTests、AITerminalOperationTests 共 37 项全部通过（37.12s），日志 /tmp/axon-cv-isolation-final.log。覆盖并发取消/队列隔离、同终端互斥、批量问题、实际按钮、纯对话纠正、跨重启日志/收件箱、场景文件隔离、权限拒绝/取消、分叉、真实 PTY 执行/接管/长程序和结果关联。
+- 额外广泛运行的 AIConversationInteractionTests 中，旧 testApprovedInputAndReturnShareOneAuthorization 未通过：夹具没有可确认 Shell 状态，终端拒绝输入。尝试接入真实 hook 后夹具未收到 ready，亦未通过；已撤回本次对该夹具的修改，未放宽产品终端检查。该类其余用例通过。广泛日志 /tmp/axon-cv-acceptance.log；因此不能宣称全量测试通过。
+- 实际 UI：亲自打开并检查 320/600pt 表单、收件箱、草稿/语音入口，以及 MainView 1050×680、1400×860 主工作台截图；发现并修复工具栏挤压标题和澄清滚动区高度被压缩。主操作仍可达，剩余问题在表单中滚动。截图 native/dist/ui-0.19.13/；实际原生按钮完成多选和统一提交，并打开/新建会话。复验日志 /tmp/axon-cv-ui-final.log、/tmp/axon-cv-isolation-final.log。Connections.swift 原有视图更新中发布警告仍存在。
+- 未执行用户服务器命令；仅本机隔离测试夹具。没有安装或重启应用，保留既有运行会话。发布包校验结果见本节后续记录。
+
+- 最终 Release 构建成功（71.71s）；打包后二进制的全部 Mach-O __TEXT 节与 release 产物一致（签名会改变签名数据，不能直接比较整文件）。严格 codesign 与 ZIP 完整性检查通过，版本 0.19.13 / build 178；ZIP native/dist/Axon-0.19.13-mac-arm64.zip，SHA-256 7e9c735a8d8bbc7030dac55d0465cae4cc2dc7c05bff3be2fff4a8918f20c226。构建日志 /tmp/axon-01913-package-verified.log。未安装或重启。沙箱内重复签名校验受信任服务访问限制，在授权执行中复验通过。
+
+## 0.19.14 (179) — 计划与可复用知识（2026-10-10）
+
+- PL01–04：计划依赖有界校验（不存在/重复/自身依赖及环拒绝）、步骤增删排序、20 版历史和逐项差异、选择阶段/暂停/恢复、独立待办。修改动作必须进入有效所选阶段并满足当前依赖；新完成状态在有未验收修改时拒绝，阶段状态仍不是成功证据。只读观察可在阶段外进行，任意命令是否在语义上属于该阶段仍由模型遵循，不能声称应用能通用证明。
+- PL05：每次已知目的目录修改前重读层级指引，内容变化先返回模型决策；Shell 字面量重定向、touch/mkdir/tee/cp/mv 等新增保守路径收集。不明确变量和混合 cd/重定向拒绝；动态脚本/解释器的任意写入路径仍无通用识别，PL05 保持部分。
+- PL06–08：本机知识库 CRUD、搜索、类型/范围选择、JSON 合并导入导出、SKILL.md 导入、项目/全局技能发现、空草稿 / 选择器、{{input}} 字面参数。知识/记忆按目标和项目边界匹配，技能元数据有界并按需加载正文。模型只能提出记忆，人工保存且开启后才自动用于后续任务；纯对话使用全局/analysis 记录。损坏原库拒绝覆盖、写入原子化和 0600 权限；最多 100 条、50 条记忆、2 MB。无云端同步/共同编辑、自动学习或外部技能安装器。
+- 新增 AIPlanningKnowledgeTests 10 项：依赖与验收边界、变化与排序、范围隔离/开关、跨实例持久化、冲突导入不覆盖、JSON 导出回读、文件权限、损坏库保护、参数非递归且不执行、草稿不发送和过期条目拒绝、字面写入作用域/动态拒绝、真实 UI 编辑保存与插入、键盘 / 和计划选择、修改入口拒绝、阶段/待办历史恢复、记忆提议不自动保存。
+- 最终相关回归 AIPlanningKnowledgeTests、AIInteractionTests、AISessionCollaborationTests、AISkillsTests、AIProjectGuidanceTests、AITaskCapabilitiesTests、AIAgentTests、AIP0ReliabilityTests：79 项，3 项按原 opt-in 条件跳过，0 失败（53.66s）。日志 /tmp/axon-pl-delivery-tests.log。跳过：真实认证 Codex CLI/native 和原 Axon native hello-world，未配置 opt-in；没有向用户服务器发送验收命令。
+- 初次回归旧 testTerminalTaskConsentUIAndScope 无 Shell/程序开始状态，被生产保护拒绝。修正测试明确注入交互 Bash 开始事件，并等待异步输出；不添加结束事件、不声称退出已验证、不更改终端保护。中间仅注入 Shell 输入状态时批准的是单条 Shell 命令，不能断言交互任务授权；最终正确交互程序 fixture 和全套回归通过。相关复验 /tmp/axon-pl-final.log（11 项通过）。
+- UI：实际 NSHostingView/AppKit 截图已打开观察。660×600 计划、620×620 知识库、580×520 编辑页、500×400 使用预览、320/600pt 助手及 MainView 1050×680/1400×860 已检查；长名称、禁用异目标使用、阶段空选/选中、展开菜单、原生保存、使用预览→填入草稿、方向键/Return 比较版本、/ 仅空草稿拦截均检查。发现并修正阶段方形标记边缘裁切，扩大整块命中；编辑其他项目记录保留原范围并显示准确目标/目录。截图 native/dist/ui-0.19.14/。导入/导出数据回读通过，NSOpenPanel/NSSavePanel 的用户文件选择路径尚未自动操作验收。
+- 对比文档第 4 节更新为本机基础能力及具体剩余边界；保留历史交付说明。git diff --check 通过。已有 Swift 并发/无障碍弃用及视图更新发布警告仍存在。
+- 未安装 /Applications/Axon.app，未强退或重启应用，保留现有窗口及连接。
+- Release 构建成功（日志 /tmp/axon-pl-package.log），严格 codesign --verify --deep --strict、ZIP 完整性及版本 0.19.14/build 179 检查通过；打包可执行文件全部 Mach-O __TEXT 节与 native/.build/release/TabbyNative 一致。ZIP：native/dist/Axon-0.19.14-mac-arm64.zip；SHA-256：d7b730e6be87873c9e4691f973659f4145a9407dca61a5fdb7b1635b66b5999b。
+- 在全套回归后修正普通继续/选择阶段执行时不重置计划版本列表；最终 AIPlanningKnowledgeTests 再跑 10 项全通过（2.31s，/tmp/axon-pl-history-final.log），明确断言执行与恢复后仍保留两版。选中阶段 screenshot plan-selected.png 已打开观察，方形 accent 勾号完整显示。最终 UI 截图重新归档。
+
+
+## 0.19.15 (180) — 文件修改与开发工具（2026-10-10）
+
+- ED03–06：写入前重查原文件元数据、权限及内容摘要；差异按原文行分块，可勾选、手改与逐块评论，统一要求返回模型重新提案，不直接写入。人工修改后的内容摘要进入任务检查点，写入后逐字节验收并继续原目标验证。敏感内容脱敏展示，涉及脱敏的块禁用手改；超过 1000 行使用整文件块。备份上下文菜单可比较并恢复，恢复前检查当前文件，保留被恢复前内容的另一份备份。
+- ED06 保留部分：批量修改先完成所有暂存与校验，再逐个提交；失败、权限改变或取消时逆序恢复。模拟第二次提交失败、rename 已完成后抛错、取消和第三方并发修改均有检查；并发修改不覆盖，保留原备份并报告恢复不完整。不是多文件对观察者的原子事务；进程崩溃、掉电和持续断线仍需人工恢复。远端 FileEndpoint 故障用本机包装夹具注入，未连接真实 SSH 主机验收。
+- ED07–09：本机文件操作菜单进入开发工具，可看 Git 状态与 diff、暂存/取消暂存、切换干净分支、创建与打开 worktree；仅删除本应用登记且干净、未锁定、非当前目录的 worktree，保留分支。关闭 hooks、fsmonitor、外部 diff/textconv 和递归子模块；切换禁止覆盖 ignored 文件。评论关联 diff 源行/目标行并填入项目 AI 草稿，不自动发送。独立项目任务固定目录、历史与上下文，无当前终端 PTY；同一目录复用同一个在用助手，关闭窗口停止其任务。这不是操作系统沙箱，也不是后台多代理调度。
+- ED10 保留部分：用户明确选择已安装的本机 stdio LSP 可执行文件及 JSON 参数，接收符号与当前版本诊断、定位，格式化仅修改编辑草稿；支持 UTF-16 位置及 LF/CRLF/CR。保存仍走原文件冲突保护与备份。未实现补全、重命名、多文件 workspace edits、服务端命令、远端 LSP 或完整 IDE。受控 Python 服务验证分帧、Unicode、过期格式化拒绝与请求取消；真实本机 SourceKit-LSP 的 Swift 符号与格式化测试通过。ED11 按原文用户撤回要求保持不做。
+- 最终关联回归：DevelopmentTools、AIProjectContinuity、AITaskCapabilities、AIInteraction、AISessionCollaboration、AIPlanningKnowledge、ExternalEditSourceUI、FileWorkflowNavigation/Integration、FilePaneLayout、StandaloneFilesLifetime 共 84 项，2 项按原远端 opt-in 条件跳过，0 失败（51.217s）。其中新增开发工具 13 项逻辑/集成及 4 项实际 UI 测试。日志 native/dist/ui-0.19.15/axon-ed-delivery-final.log。没有执行用户服务器验证命令。
+- 初次关联回归中的旧测试仍预期失败后保留第一处写入，以及旧差异标题；已改成整组恢复与实际差异断言。实际主工作台测试发现初始目录刷新与显式目录请求竞争，产品修正为请求处理期间不执行初始打开；1050/1400pt 均验证所选目录。UI 测试修正了原生文本绑定、sheet 关闭及物理路径别名的夹具。最后一轮前本机 HTTP 恢复用例出现一次未复现失败；单独复验及最终 84 项整组通过，记录保留于 axon-ed-delivery-tests.log 与 axon-ed-health-debug.log，未放宽产品保护。
+- UI 已亲自打开观察真实 NSHostingView/AppKit 截图：差异选中/未选、手改后的批准页、备份恢复、LSP 未连接/诊断符号/格式化草稿、Git diff/暂存/评论、长分支下拉和键盘选择、worktree 已登记/主目录删除禁用、独立项目任务与设置、文件操作菜单实际进入开发工具、主工作台 1050×680 与 1400×860。实际按钮完成批准→写入→目标复验、格式化→保存→备份、Stage/Unstage、评论→AI 草稿及返回；保留原导航和连接。诊断低对比图标改为明确错误/警告/信息文字并重渲染检查。21 张截图保存在 native/dist/ui-0.19.15/。现有 Swift 并发/无障碍弃用和视图更新发布警告仍存在。
+- 对比文档第 5 节已更新实际能力与上述边界。未安装 /Applications/Axon.app，未启动、强退或重启应用，保留既有窗口和连接。发布包校验见本节后续记录。
+
+- Release 构建及打包成功（125.32s，native/dist/ui-0.19.15/axon-ed-package.log）；严格 codesign --verify --deep --strict、ZIP 完整性及 plist 0.19.15/build 180 检查通过。打包可执行文件全部 29 个 Mach-O __TEXT 节与 release 产物一致。ZIP native/dist/Axon-0.19.15-mac-arm64.zip；SHA-256：70d40c74408470b56e600226512c2f94feadc500c0821440ac1b46fd220a1f9b。git diff --check 通过；未安装或重启。
+
+- 用户随后明确授权本机安装：已备份旧应用至 /Users/fengheliang/workbench/source/g20/tabby/native/dist/backups/Axon-0.19.11-20261010-095931.app，校验临时安装副本后原子交换至 /Applications/Axon.app。安装后版本 0.19.15/build 180、严格签名校验及可执行文件 SHA-256 与发布包一致；保留用户图标选择。回执 native/dist/installation-0.19.15.txt。未启动、强退或重启应用，现有进程继续运行，主动重启后加载新版。
+
+## 0.19.16 (181) — AI 设置预设说明与卡片对齐（2026-10-10）
+
+- AIAgentProfileFields 在背景前扩展到父容器宽度，与服务设置、项目指引卡片对齐；字段仍保留紧凑宽度。
+- “代理配置”改为“AI 设置预设”，说明保存和切换一套服务、模型、权限与指引的用途；按钮改为预设用语，并明确下方设置自动生效与手动更新已存预设的区别。API Key 仍独立存于钥匙串，未改变配置应用或保存逻辑。
+- AIAgentProfileTests 4 项通过，0 失败。真实 NSHostingView/AppKit 渲染检查 560/820pt 设置页及长名称已选/未选菜单，Escape 关闭通过；运行时选择、键盘与禁用回归通过。已亲自打开观察设置页和菜单截图；卡片边缘对齐、说明换行正常。证据 native/dist/ui-0.19.16/。
+- 未安装、启动或重启新版应用；保留当前窗口及连接。发布包结果随后记录。
+- Release 构建完成（120.89s）；打包脚本严格 codesign 校验通过，ZIP 完整性通过，plist 版本 0.19.16/build 181。发布包 native/dist/Axon-0.19.16-mac-arm64.zip；SHA-256 d947fbcbe52daf1ec742c74708dccc01b78730acf007e4cf2919a773dd69219e。构建日志已存入上述证据目录，git diff --check 通过。未安装或重启。
+
+
+## 0.19.16 (181) — 失败、恢复与完成验收及 ED11（2026-10-10）
+
+- 用户重新要求 ED11，与 Warp 官方 Code Review 的按块撤销/整组丢弃体验对照；不推断其内部事务实现。Axon 新增 AI 文件时间线：原/新字节在副作用前落盘，单文件/多文件/差异块预览撤销与重做，支持从较新已记录版本回到旧版本；恢复生成新记录。已有历史不会补录，Shell、手动及外部编辑器修改未自动捕获。
+- 本机私有快照目录 0700、文件 0600；64 次、每次 8 文件、每文件 64 KiB、总计 16 MiB。读取有界、损坏/符号链接库拒绝使用及覆盖；落盘失败不写目标。优先淘汰已核对的记录，待核对记录不自动丢弃。快照正文不自动传给模型；显示内容脱敏。目标、主机和目录都须匹配，策略拒绝不可绕过；恢复期间该助手禁止开启另一个任务。
+- 单文件改为与批量共用整组暂存/校验、逐个提交、取消/失败逆序恢复链路；提交前重查策略及文件元数据/字节。恢复只接受当前为已记录版本的文件，未知新内容和预览后的并发改变拒绝覆盖，保留备份。未选差异不混入恢复检查点；较晚文件版本覆盖较早的已完成检查点，避免同一路径多次修改后误报不确定。
+- RC01–03：保留请求重试与最多两次任务重连，重连后刷新文件/终端并清空原验收通过项。Codex 原生结构化中断走任务恢复，注入服务测试使用相同路径；真正外部模型断流未在本轮制造。无效响应最多三次、不完整流和未验证工具不执行；操作、冻结验收失效状态及执行 ID 先持久化。
+- RC04–07：结果不明的命令即使目标检查已通过，也不能得出成功结论或重复提交新修改。存在的混合文件版本可从重新加载的时间线选择补齐/撤销，再按原目标继续；整组原字节才标为未应用，重新提案仍经过审批。完成过的文件动作恢复原版本后标为已撤销，不自动重放。人工恢复使同一目标的关联任务进入中断状态并清空通过项，不影响另一个目标的任务。新「恢复证据」页显示回执、文件、运行/不明状态及固定检查。
+- 环境边界：未提供多文件可见性原子性、通用 exactly-once、任意 Shell 副作用撤销、文件创建/删除/改名恢复、崩溃后原名缺失的自动重建、跨进程 PTY 再附着或持续断线自动恢复。删除/丢失/无法读取/备份损坏时仍停下并要求人工核对。远端文件逻辑沿用 FileEndpoint，但本轮没有连接用户 SSH 主机或制造真实 SSH 故障。
+- 实际 UI：亲自打开 NSHostingView/AppKit 截图检查时间线条目长标题、两文件选择、差异块选中/未选、预览/应用、恢复回执、更新内容冲突与禁用、目标验收待完成、恢复证据及 320/600pt 助手工具栏。按钮实际完成按块撤销→写入→再次撤销以重做，并核对恢复后只使原目标的验收失效。新增工具栏拆成独立紧凑操作行，窄面板不溢出；恢复后标签依据已校验字节更新。相关既有主工作台 1050/1400pt 与文件导航回归继续运行。截图已在 native/dist/ui-0.19.16/ 归档。
+- RC08 本机兼容矩阵：Bash 与 Zsh 均用真实 LocalTerminal/PTY、临时独立 HOME 和用户配置，验证非零退出、sleep 长任务、重新创建 bridge 按同一执行 ID 查询、追加文件精确一次、未知 ID 拒绝和人工 Ctrl-C 后状态不冒充成功。关联回归还覆盖真实 Python/SQLite 输入、程序接管/交回、取消不终止原程序、重复命令输出隔离及过期/畸形 hook 拒绝。未验证 fish/PowerShell、远端不同 OS 或 Warp 同任务对照，RC08 保留部分。
+- 首轮 52 项相关回归，2 项外部模型 opt-in 跳过，0 失败（69.432s）；扩大后的 124 项，2 跳过，0 失败（115.961s）。之后增加重连测试出现 4 个断言失败：注入后端走了请求层重试而夹具预期任务层重连，且只读夹具返回固定文字，没有读取修改后的文件。修正注入选项与真实 Codex 同路，并改用实际文件读取，未放宽验收；新增 10 项随后全部通过（14.905s）。随后做整组最终复验，结果见后续记录。现有 Swift 并发、无障碍弃用与视图更新警告保留。
+- 对比文档第 6 节、ED11 和交付边界已更新。沿用此前用户本机安装授权；备份、安装、版本与签名结果在完成后追加。保持既有进程和连接，不强退或重启。
+
+- 最终整组 125 项，2 项认证外部模型 opt-in 跳过，0 失败（116.320s，native/dist/ui-0.19.16/axon-rc-accepted.log）。随后修正恢复后标签的反馈并在当前源码再跑 AIRecoveryTimelineTests 10 项，0 失败（14.809s，axon-rc-ui-final.log）；实际截图重新打开观察，显示正确的原版本/其他已记录版本，未处理文件不冒充已核对。共 33 张新旧关联 UI 截图归档 native/dist/ui-0.19.16/。git diff --check 通过。
+
+- Release 构建及打包成功（127.17s，native/dist/ui-0.19.16/axon-rc-package.log）；严格 codesign --verify --deep --strict、ZIP 完整性及 plist 0.19.16/build 181 检查通过。打包可执行文件全部 29 个 Mach-O __TEXT 节与 release 产物一致。ZIP native/dist/Axon-0.19.16-mac-arm64.zip；SHA-256：2b53fe17f5c465dbfb8123c350416769441de762bff5339b52158fea0fffbe29。git diff --check 通过；打包检查阶段未安装或重启，随后安装结果见下一条。
+
+- 沿用用户本机安装授权：旧版备份 /Users/fengheliang/workbench/source/g20/tabby/native/dist/backups/Axon-0.19.15-20261010-103335.app，临时安装副本校验后原子交换至 /Applications/Axon.app。安装后 0.19.16/build 181、严格签名及可执行文件 SHA-256 与发布产物一致，保留白色图标。回执 native/dist/installation-0.19.16.txt。未启动、强退或重启应用，现有会话保持；主动重启后加载新版。
+
+
+## 0.19.17（182）：权限、安全与运行配置（2026-10-10）
+
+- 新增五类工具权限：读取/检索文件、文件修改、命令/检查、运行中终端交互、网页/公开搜索；遵循批准模式/始终确认/自动允许/禁止，随命名预设保存，旧 JSON 缺省迁移不变。验证未知类别拒绝保存及所有工具别名归类。命令禁止也禁止独立模式初始化系统探测；可用当前终端模式在允许终端观察时进行文件操作。
+- 内置禁止、系统/服务器黑名单、精确 deny、高级 deny、工具禁止均优先；高级 ask、工具始终确认及每次批准不能被精确允许/全权限/工具自动允许跳过。修复每次批准此前被精确允许绕过的问题，对应旧断言同步为新的逐次批准语义。
+- 终端纯文本暂存前也核对工具禁止/确认，已批准提交与任务级交互批准不能绕过显式工具配置；批准后再检查实际端点、命令、脚本、服务器规则及终端开关。真实 Bash PTY 夹具验证模型请求过程中改变终端工具为禁止/始终确认时，文本不进入 Shell。网页引用没有执行目标也遵守网页禁止，在发起 DNS/HTTP 之前拒绝。
+- 新增 AISecurityConfigurationTests：优先级/别名/旧配置与预设迁移、无目标网页拒绝、不可调整 deny 与已识别秘密/终端控制序列脱敏、真实 PTY 输入前开关、工具下拉键盘和禁用、实际 MainView 设置路径持久化。SC08 为确定性工具边界测试，未执行真实模型提示注入攻击/任意秘密/二进制或未知包装程序的完整对抗测试；不宣称完整防泄露或远端 OS 沙箱。
+- SC01–06 现有检查覆盖系统/服务器叠加、批准后黑名单变更、脚本内容改变与重新检查、嵌套 Shell、动态与下载执行拒绝、编辑器永久禁止、设置与预设、限额校验。没有新增 MCP 执行器、云端权限或目标 OS 沙箱。终端/Shell 账号权限和用户主动附件的范围详见 AXON-WARP-COMPARISON.md 第 7 节。
+- 首轮编译发现显示标题需 MainActor 标注，已修复。23 项聚焦测试通过（10.107s）。扩大回归首轮 151 项/3 跳过，出现旧 everyTime 允许断言及一次设置夹具临时目录清理异常；旧断言修正后，临时目录异常单独复跑通过。第二轮 152 项/3 跳过只有完整设置多窗口夹具的相对键盘移动断言失败，产品其余检查通过；改成两个宽度各自独立配置，并提供有效模型字段后，最终聚焦 8 项全部通过（16.096s），包含 6 项新增安全/界面测试、完整旧设置导航及修正权限断言。保留全部实际日志，不把早期失败日志写成零失败。跳过项为需要明确开启的真实登录模型/图片联网测试。
+- 真实 NSHostingView/MainView 截图：工具权限 320/600pt、展开菜单、选择禁止、禁用；完整设置 1050/1400pt 及实际键盘选择、自动保存、重新读取磁盘配置。开发者已打开观察菜单、窄/宽控件、禁用以及完整设置保存后截图；保持现有侧栏/浅色外壳、38pt 紧凑选择字段、焦点与滚动。证据 native/dist/ui-0.19.17/，git diff --check 通过。
+
+- Release 构建及打包成功（131.20s，native/dist/ui-0.19.17/axon-sc-package.log）；严格 codesign --verify --deep --strict、ZIP 完整性及 plist 0.19.17/build 182 检查通过。打包可执行文件全部 29 个 Mach-O __TEXT 节与 release 产物一致。ZIP native/dist/Axon-0.19.17-mac-arm64.zip；SHA-256：5529a6ea3611d8c9ce55eaa0c65a002f635a5c3919baa1f8afa5014a34dfb57b。git diff --check 通过；打包检查阶段未安装或重启，随后安装见下一条。
+
+- 沿用用户本机安装授权：旧版备份 /Users/fengheliang/workbench/source/g20/tabby/native/dist/backups/Axon-0.19.16-20261010-105339.app，临时安装副本校验后原子交换至 /Applications/Axon.app。安装后 0.19.17/build 182、严格签名及可执行文件 SHA-256 与发布产物一致，保留白色图标。回执 native/dist/installation-0.19.17.txt。未启动、强退或重启应用，现有会话保持；主动重启后加载新版。
+
+## 0.19.18 / build 183：MD04、MD05、MD06（2026-10-10）
+
+- 范围限于模型章节 MD04–06；保留此前源码改动。流式响应要求完整结束状态、工具调用 ID、单候选及合法注册工具参数；断流、长度截断及非预期调用不能执行。服务用量独立累计，ChatGPT include_usage、Claude 起始/增量用量、Codex 线程累计差额及重复事件去重；费用使用显式模型单价。新增当前任务面板、历史保留、200 次明细及旧记录累计、Token/估算美元预算，响应后与下次请求/操作前检查，处理中修改预算也立即参与下一边界检查。单价在执行时锁定；未知用量、未定价或失败响应不能默认免费。
+- MCP 支持 Axon 管理 stdio 与 Streamable HTTP JSON/SSE，手动连接/初始化/工具发现、只读显式选择、MCP 类别和逐服务审批、Keychain 凭据、会话头/协议头及 HTTP Bearer、工具实际结果和错误记录。配置改变失效、取消/超时关闭，不自动重发不确定请求；不继承 CLI MCP，不接收服务主动执行、资源或媒体自动加载。HTTP 服务只读注解不能证明服务端无副作用，仅连接用户明确可信服务；其他限制见比较文档 MD06。
+- 实际本机 Python stdio 夹具验证初始化、发现 3 项工具、只允许选取 read_status、危险名称和无只读声明禁用、调用返回实际文本；尝试写项目文件和建立网络连接均被拒绝。完整 Agent 夹具验证逐服务 ask 能覆盖 fullAccess、经实际批准才调用 MCP、不会转换为 Shell。HTTP 本机服务验证 JSON 初始化/发现与 SSE 工具结果、Bearer、session/protocol headers、错 ID 拒绝。超时后同一客户端不能重放调用。
+- 初期 Python 包装器/读取路径诊断导致 stdio 夹具失败，已解析 Xcode 实际解释器并用 realpath 固定项目/脚本目录。根目录 literal("/") 规则曾被自动审批误判为递归读取；独立合成范围测试证明项目外文件读取/写入均被拒绝，审查接受后继续。此规则仅根目录自身，非 subpath("/")；不采用不安全回退。HTTP 夹具的 http.py 标准库命名冲突已修复。
+- 相关扩大回归 112 项/4 跳过：首轮只有两处新 UI 夹具断言问题（禁用控件拒绝操作、SwiftUI 按钮不是 NSButton），修正后复跑只有两个旧流式夹具未提供调用 ID，已补入真实协议的 ID。最终聚焦 42 项/2 跳过/0 失败（31.530s）；最后即时预算变更及最终源码聚焦 20 项/0 失败（17.027s）。更早日志保留，未把曾失败的整轮写成全通过。跳过项为需明确开启的真实登录 Codex/图片联网测试；没有调用用户服务器或收费模型来验收。
+- 实际 NSHostingView/MainView 渲染：用量空/已报告/不完整、单价、MCP 连接/失败/只读已选/未选/禁用、长名称和编辑表单，480/760pt 局部与 1050/1400pt 完整设置导航；原生工具多选实际点击、禁用拒绝、逐服务下拉键盘选择、保存及磁盘重载。开发者已打开观察用量、设置、编辑器、选择卡、展开菜单、完整设置与 MCP 区域截图，侧栏/滚动/按钮均可达。证据 native/dist/ui-0.19.18/，git diff --check 通过。
+
+- 最终补充：stdio 写管道启用 F_SETNOSIGPIPE，只影响该管道，服务断开返回错误而非终止 Axon；旧版无 usage 字段的任务显示历史用量未知并阻止预算核对，分叉显式开启新账本。MCP 审批明确显示本机 stdio / 实际 HTTP 服务、名称、工具和完整参数，只提供单次批准。补充空/连接中/失败/禁用及批准面板实际截图并打开检查。9 项状态/管道测试、25 项历史/分叉/用量/流式测试及最终 14 项 MCP 审批/历史复验全部零失败（7.719s / 21.463s / 10.987s）。最终产物需在这些补充后重新构建；首次包日志保留为 axon-md-package-initial.log。
+
+- Release 构建及打包成功（native/dist/ui-0.19.18/axon-md-package.log）；严格 codesign --verify --deep --strict、ZIP 完整性及 plist 0.19.18/build 183 检查通过。打包可执行文件全部 29 个 Mach-O __TEXT 节与 release 产物一致。ZIP native/dist/Axon-0.19.18-mac-arm64.zip；SHA-256：50c511d5c3af7cc6c531fe41ae476dc1c59f440d57ba79a94652454e7d328cdc。git diff --check 通过；打包检查阶段未安装或重启，随后安装见下一条。
+
+- 沿用用户本机安装授权：旧版备份 /Users/fengheliang/workbench/source/g20/tabby/native/dist/backups/Axon-0.19.17-20261010-114352.app，临时安装副本校验后原子交换至 /Applications/Axon.app。安装后 0.19.18/build 183、严格签名及可执行文件 SHA-256 与发布产物一致，保留白色图标。回执 native/dist/installation-0.19.18.txt。未启动、强退或重启应用，现有会话保持；主动重启后加载新版。
+
+- 最终发布构建 122.41s；另加当前终端 MCP 夹具 1 项通过（0.268s），确认命令类别禁止、MCP 类别允许时仍经 MCP 客户端取得结果，既不调用独立 Shell 也不变为 terminal_execute。最终完整参数批准、空/加载/错误/禁用截图已同步到 native/dist/ui-0.19.18/。
+
+- 2026-10-10：按用户要求删除 native/dist/backups 下全部 64 项本机旧版应用及配置备份（约 2.6 GB）；当前安装、发布包与验收素材保留。
+
+## 2026-10-10 · AI 助手图文使用手册（0.19.19 / 184）
+
+- 新增 24 章离线中文手册，约 1.4 万字，覆盖配置、入门、上下文、项目索引、会话／队列／语音／通知、终端交接、计划、知识／记忆／Skills、文件审查／时间线、Git／worktree／LSP、权限／预设／预算／MCP、恢复与实战。每章含入口、流程配图、步骤、可复制示例、结果检查与边界；附 4 张实际界面截图，图中数据为测试示例。
+- 帮助菜单、助手标题栏与 AI 设置打开独立可调整大小的手册窗口；不修改终端连接或任务所有权。支持目录、全文多关键词搜索、空结果提示、章节切换、文本选择、剪贴板复制及截图放大。
+- 实际 NSHostingView/AppKit 检查 720／1060pt 窗口、正常及空搜索、MCP 图文页和放大、FAQ 完整正文及助手入口；截图已打开逐项观察。入口、上／下一章、搜索、清除、放大关闭、复制和助手打开窗口均通过原生控件交互测试。截图与日志：native/dist/ui-0.19.19/。
+- 最终手册与相关助手回归 8 测试通过，0 失败。更广回归 13 测试有 4 个测试失败（5 断言）：两个旧权限测试仍期望 everyTime 自动允许记住规则，一个旧终端夹具不能确认输入状态，云设置导航测试找不到既有原生按钮。手册测试均通过；未改变这些权限、终端或云设置行为，未声称全量回归通过。原始日志 manual-broader-regression.log 已保存。
+- Release 构建 133.29 秒；严格 codesign 校验及 ZIP 完整性通过，打包／ZIP／源码的 24 章与 4 张 PNG 逐字节一致。ZIP SHA-256：cb8bd72235bf3c54156d31e792e2a099772c6805a1aa6bf0121485dc72c5ed05。
+- 已安装 /Applications/Axon.app，版本 0.19.19（184），安装后签名及可执行文件哈希通过，内嵌资源复核为 24 章／4 截图；保留白色图标。按用户要求不保留安装旧版备份，没有启动、强退或重启应用；主动重启后加载新版。安装回执：native/dist/installation-0.19.19.txt。
+
+## 2026-10-10 · 手册图片可读性与目录（0.19.20 / 185）
+
+- 删除正文截图的 360pt 高度限制，按内容宽度等比显示完整图片；正文最大宽度从 820pt 调整为 1100pt，避免大窗口仍以小缩略图呈现。竖版截图在正文滚动阅读，仍支持点击放大。
+- 左侧增加固定「目录」标题及 7 分类快捷入口；保留完整章节目录和全文搜索。点击分类清除搜索并定位首章，章节切换自动滚动目录定位，重复点击分类也可定位。侧栏宽度 260pt。
+- 实际 AppKit／SwiftUI 检查 720／1060／1400pt 宽度：正文大图、目录标题、分类选中及跳转、章节导航、搜索／空结果、复制与图片放大关闭。截图已打开观察，图片文字明显增大，目录固定可用，无横向溢出。2 个手册测试通过，0 失败；截图及日志 native/dist/ui-0.19.20/。
+- Release 构建 124.62 秒，严格签名／ZIP 完整性通过；24 章与 4 图片的发布包／ZIP 资源逐字节核对通过。ZIP SHA-256：b79dfb0962197759b91131d82b9f9a4228f531f97ab5f31a6d7b81d5a44bc358。
+- 已安装 /Applications/Axon.app，复核版本 0.19.20（185），安装后签名与可执行文件哈希通过，保留白色图标。按用户要求不保留旧版安装备份，未启动／重启应用；用户主动重启后加载新版。回执 native/dist/installation-0.19.20.txt。
+
+
+## 2026-10-10 · 目录悬停与关于窗口定位（0.19.21 / 186）
+
+- 手册分类与章节导航复用 WorkspaceMenuItemStyle；使用透明 AppKit trackingArea 覆盖整块条目，悬停／按下时使用 Palette.selected，移出恢复，选中状态持续保留。跟踪视图不拦截鼠标点击，悬停不切换章节。
+- 替换应用「关于 Axon」菜单动作，保留系统标准关于面板；按当前活动窗口中心定位，并限制在所在屏幕 visibleFrame 内。复用面板，重新打开时按当前窗口位置定位。
+- 实际 AppKit／SwiftUI 验收：原生 mouseEntered／mouseExited 导致截图变化及恢复，且未触发点击；目录跳转、搜索、图片放大关闭、复制与手册入口通过。检查 720／1060／1400pt 手册截图及悬停前后；关于标准面板的实际位置、重新定位及屏幕边缘约束通过。标准面板截图透明背景合成白色后已打开检查（测试进程使用 xctest 元数据，应用正文内容未改动）。最终 4 个测试通过，0 失败；截图和日志 native/dist/ui-0.19.21/。
+- Release 构建 136.95 秒；严格 codesign、ZIP 完整性及内嵌 24 章／4 图片逐字节核对通过。ZIP SHA-256：9be7097ea21be9123d282ac6d04f9f653b89fcd58e8e16eedff7d1eb4c9b0413。
+- 已安装 /Applications/Axon.app，版本 0.19.21（186），安装后签名与可执行文件哈希验证通过，保留白色图标。按用户要求不保留旧版备份；未启动、强退或重启 Axon，主动重启后加载新版。安装回执 native/dist/installation-0.19.21.txt。
+
+## 2026-10-10 — 0.19.22 (187)：全章节图文使用手册
+
+- 24 章全部补齐真实 SwiftUI/AppKit 操作截图，共 42 张。使用代表性测试数据，注明示例数据；复用此前已验收功能截图，并补拍当前服务配置、执行方式、Agent、权限和运行中队列。未连接用户服务器或调用真实云端 API。
+- 每张图具有标题、三个编号操作位置及对应说明；复杂章节分图展示。图片按正文内容宽度展示，每张独立点击放大。搜索纳入图标题与说明；同步程序 JSON、Markdown 手册及可再生成的配图目录和脚本。
+- 亲自打开检查全部 42 张标注图，以及 720/1060/1400pt 实际 NSHostingView 手册、MCP 章节和会话分叉放大视图；修正截图裁剪与编号坐标。截图位于 native/dist/ui-0.19.22/；原图及来源位于 native/Documentation/ManualScreenshots/。
+- AIManualTests 5 项全部通过，0 失败。覆盖 24 章 42 张资源解码与编号说明、目录悬停、分类跳转、上一章/下一章、搜索空结果、逐张放大/关闭及示例复制；原生入口截图使用测试执行器。测试日志 native/dist/ui-0.19.22/tests.log。
+- Release 构建成功；严格 codesign 和 ZIP 完整性通过，App 与 ZIP 内 24 章 JSON 和全部 42 张图片逐文件匹配。ZIP SHA-256：6079aee63d2fe66edf79b5510eddb271bad522dbbbdcd91f87d086377729a454。
+- 已安装 /Applications/Axon.app 0.19.22 (187)，安装版本与可执行文件哈希校验通过，保留白色图标。遵循用户无需备份要求，未保留旧版备份；未退出、启动或重启应用，用户主动重启后加载新版。
+
+## 2026-10-10 — 0.19.23 (188)：现有 AI 功能优化与补强
+
+- 对话失败/停止后增加显式「重试回答」；只对未执行的对话回合开放，保留原问题，不覆盖不同的新草稿。中断的回答在持久历史及模型上下文中注明未完成；执行任务继续使用原目标核对与恢复路径。输入与排队统一 24,000 UTF-8 字节限制，界面提示使用 @ 文件引用。输入校验错误不会把之前成功的回答误标为可重试。
+- 发送返回接纳状态；队列仅在请求被接纳后移除。终端被其他会话占用、文件恢复和原目标不匹配时，保留队列、草稿、历史和用量。取消后重新检查请求代次，旧上下文收集不发起新模型请求。
+- 收件箱增加会话/目标/状态搜索、空结果、未读数量和全部已读。点击已关闭的会话历史可重新打开主会话或附加会话，不恢复旧审批、队列或自动执行；无法定位历史时提供反馈，桌面通知只在成功定位后标为已读。重启按修改时间加载最近 19 个附加会话，仍最多 20 个活动会话。
+- 计划和 MCP 目录作为当前决策上下文提供，避免每轮重复累积至历史；目录保留完整工具及 schema，超出目录预算的条目明确报告省略。原始工具权限、批准和固定目标验收仍由现有执行链控制。
+- 同一请求累计用量采用不回退合并，迟到/重复报告不会减少已计入 Token 或预算；费用和旧用量未知仍保守处理。停滞状态保持到新证据或显式重置。增量索引复用未变化文件也遵守 2,000 片段硬上限；扫描节点响应取消及目标有效性检查。
+- 新增 13 项优化回归，覆盖队列被拒绝不丢失、错误目标不改历史、新草稿保护/中断历史、关闭的主/附加会话重开、启动最近会话、累计预算不回退、停滞、三轮增量上限、计划上下文不重复、目录完整 schema，以及实际重试/搜索/全部已读控件。
+- 全部 AI 相关回归 233 项：0 失败、7 项需登录真实 Codex 的测试按条件跳过（226 项通过）；最终重试状态和手册资源细化后再执行 18 项相关验收，0 失败。日志 native/dist/ui-0.19.23/ai-regression.log 和 final-controls.log。包括本机真实 PTY 及本机 SSH/SFTP 测试服务，未连接用户业务服务器。
+- 基线发现旧测试把「每次批准」误期望为记忆允许自动跳过，并期望未集成 Shell 可以执行输入；已修正测试以验证现有安全行为，未降低执行权限。全量检查另发现设置截图夹具点击不可见的下拉锚点造成零尺寸浮层；夹具先实际滚动到控件再选择，1050/1400pt 设置与下拉的真实渲染和键盘选择均通过。
+- 亲自打开检查 320/600pt 重试与长消息状态、540pt 搜索/正常和空收件箱、1050/1400pt 工作台和设置浮层，以及手册实际渲染。同步 24 章说明、43 张编号操作图；新增重试图并更新收件箱图，校正编号避免遮盖文字。截图 native/dist/ui-0.19.23/，原图 native/Documentation/ManualScreenshots/。
+- 真实系统通知横幅/点击、麦克风识别、登录模型请求及任意用户服务器没有作为本轮完成验收；保留对比清单的原环境边界及尚缺高级能力。
+- Release 构建成功；严格 codesign、ZIP 完整性及全部图文资源 App/ZIP/源文件一致性通过。ZIP SHA-256：c1f067ae21b778b663b55e77d0540d1530ea272d7d5fa7dd2f3c1cf3900a7161。
+- 已安装 /Applications/Axon.app 0.19.23 (188)，校验版本和可执行文件哈希，保留白色图标。按用户要求未保留旧版备份；未退出、启动或重启应用，原连接未操作，用户主动重启后加载新版。
+## 2026-10-14 — 0.19.24 (189)：密码输入框点击与光标
+
+- 公共 PasswordInputView 的空白区域点击可聚焦原生输入框，保留文字居中布局；密码控件固定浅色 appearance，隐藏／明文编辑器在 AppKit 设置时显式设置 Palette.text 光标颜色，并明确启用编辑与选择。
+- PasswordVisibilityTests 与 ConnectionAuthenticationTests 共 19 项通过，0 失败；最终激活窗口焦点回归另 1 项通过。覆盖空密码点击、隐藏／显示输入、Binding 更新、清空、选区、Return、禁用与关闭清理。
+- 已亲自打开检查真实连接弹窗截图及独立 AppKit 运行窗口截图，确认隐藏和显示密码的光标可见、文字居中、眼睛按钮布局正常。XCTest 截图宿主未激活时没有光标，因此另用独立 NSApplication.run 窗口验证。截图与日志：native/dist/ui-0.19.24/，live-1.png 与 live-3.png 为实际窗口截图。未连接业务服务器。
+- Release 打包完成；codesign --verify --deep --strict 在系统权限下通过，ZIP 完整性检查通过。包：native/dist/Axon-0.19.24-mac-arm64.zip。
+- 本次未安装到 /Applications，未退出或重启运行中的 Axon，现有连接会话未操作。
+
+
+
+## 2026-10-14 — 0.19.25 (190)：Tab 补全导致操作历史漏记
+
+- 核对本机实际保存记录与空排除规则：截图中的 tail 没有记录，其中一条 ls --color=auto -alF 错误关联 67 秒与 exit 130。已安装 0.19.23 的进程当天重新启动，普通工具提取的内嵌 hook 与源码一致。REA 打开目标成功，但字符串查询因未配置原生分析 provider 不可用；没有安装反编译器，改用只读 strings 核对，未将其标为 REA 分析证据。
+- 在本机真实 PTY 使用 GNU Bash 5.2.37 复现：ll 后用可编程 Tab 补全 cd/tail，Readline 继承 DEBUG 且 BASH_COMMAND 仍是上一条 alias 展开的 ls，先发出错误 begin；真正的命令随后因 running 状态被漏记。修复在 COMP_LINE 存在时跳过执行钩子，包括空补全行，不消费下一次执行或来源。
+- CommandHistoryTests 与 CommandOriginTests 相关回归共 21 项通过，0 失败。新增真实 PTY 测试覆盖 macOS Bash 3.2 与临时构建的 GNU Bash 5.2：补全未按 Return 时无记录、补全后 cd 与 tail 分别记录、tail 运行时立即入历史、Ctrl+C 130 与输出归到 tail、ll 不产生展开后的假记录、后续命令正常。GNU Bash 仅在 /tmp 构建，没有安装或改变系统 Shell。
+- 独立截图测试最初发现测试宿主未初始化 NSApplication 的问题；补齐初始化与超时中止后，最终独立测试通过（1 项，内部覆盖两版 Bash）。亲自打开检查真实捕获记录渲染的 1050/1400pt 历史页面，tail、cd、ll 行正确，长路径和长命令未遮挡按钮。截图与回归、复现前后日志位于 native/dist/ui-0.19.25/。
+- Release 打包完成，严格 codesign 校验通过，ZIP 完整性通过。包：native/dist/Axon-0.19.25-mac-arm64.zip，包含 0.19.24 密码框修复。
+- 未安装至 /Applications、未退出或重启现有 Axon、未连接或执行用户业务服务器命令。加载新版后新建终端连接才能注入新版 hook；已有漏记记录不会自动补回，未修改真实历史数据。
+
+### 2026-10-14 — 用户授权安装 0.19.25
+
+- 已先备份原版 0.19.23 到 native/dist/backups/Axon-before-0.19.25-20261014.app，再暂存校验并原子替换 /Applications/Axon.app。
+- 安装后严格签名校验、版本 0.19.25 (190) 与可执行文件 SHA-256 比对通过，保留白色图标。回执 native/dist/installation-0.19.25.txt。
+- 未退出、启动或重启 Axon，现有连接未操作。用户主动重启并新建终端连接后使用修复版。

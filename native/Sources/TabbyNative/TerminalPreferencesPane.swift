@@ -28,7 +28,7 @@ struct TerminalPreferencesPane: View {
                     TerminalFontSizeEditor(value: $draft.fontSize, valid: $fontSizeValid, chinese: chinese, input: fontSizeInput).frame(width: 180, height: 42)
                 }
                 if !fontSizeValid {
-                    Text(text("Enter a size from 10 to 40 before saving.", "请输入 10–40 的字号后再保存。"))
+                    Text(text("Enter a size from 10 to 40 to apply it.", "请输入 10–40 的有效字号后自动应用。"))
                         .font(.system(size: 11)).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: 8) {
@@ -42,14 +42,14 @@ struct TerminalPreferencesPane: View {
                         .padding(12).background(Color(hex: draft.background))
                         .clipShape(RoundedRectangle(cornerRadius: 9))
                 }
-                note(text("Font, size and cursor changes appear here immediately. Save applies them to open terminals and new sessions.", "字体、字号与光标会立即显示在预览中。点击保存后应用到所有已打开终端及新会话。"))
+                note(text("Font, size and cursor changes appear here immediately. Changes apply automatically to open terminals and new sessions.", "字体、字号与光标会立即显示在预览中。修改后自动应用到所有已打开终端及新会话。"))
             }
             card(text("History & cursor", "历史与光标")) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text(text("Scrollback lines", "回滚行数")).foregroundStyle(Palette.muted)
                     IntegerInput(value: $draft.scrollback, valid: $scrollbackValid, range: 0...1_000_000,
                                  placeholder: "250000", label: text("Scrollback lines", "回滚行数"))
-                    note(text("0 keeps only the current screen. Reducing the limit discards the oldest history after saving.", "0 表示仅保留当前屏幕；保存较小的行数后，超出范围的旧历史会被丢弃。"))
+                    note(text("0 keeps only the current screen. Reducing the limit discards the oldest history when applied.", "0 表示仅保留当前屏幕；减小行数后，超出范围的旧历史会被丢弃。"))
                 }
                 Text(text("Cursor shape", "光标形状")).foregroundStyle(Palette.muted)
                 HStack(spacing: 8) {
@@ -58,7 +58,7 @@ struct TerminalPreferencesPane: View {
                     cursor("underline", text("▁  Underline", "▁  下划线"))
                 }
                 TerminalCursorBlinkButton(selection: $draft.cursorBlink, title: text("Blink cursor", "光标闪烁")).frame(height: 40)
-                note(text("The preview above follows the cursor shape and blinking immediately. Save applies changes to terminals; programs can request their own style.", "上方预览会实时显示光标形状与闪烁。保存后应用到终端；终端内程序仍可指定自己的光标样式。"))
+                note(text("The preview above follows the cursor shape and blinking immediately. Changes apply automatically to terminals; programs can request their own style.", "上方预览会实时显示光标形状与闪烁。修改后自动应用到终端；终端内程序仍可指定自己的光标样式。"))
             }
         }
     }

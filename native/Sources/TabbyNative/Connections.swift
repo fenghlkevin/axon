@@ -65,6 +65,7 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
     var commandHistoryStore: CommandHistoryStore?
     var commandHistoryToken = ""
     var aiCommandCapture = AICommandCapture()
+    let aiControl = AITerminalControl()
     var aiApplicationCursor = false
     var aiShellInput = AIShellInput()
     var aiTerminalInputRevision: UInt64 = 0
@@ -72,6 +73,7 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
     var aiShellCompletionRevision: UInt64 = 0
     var aiShellExitCode: Int?
     var activeCommandHistoryID: UUID?
+    var activeCommandSequence: UInt64?
     var persistentOverride: Bool?
     var persistentNameOverride: String?
     var persistentSessionWasCreated = false
@@ -80,7 +82,7 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
     var pendingDirectoryInsertion: (command: String, host: Host?)?
     @Published var connected = false {
         didSet {
-            if !connected { aiCommandCapture = AICommandCapture(); aiApplicationCursor = false; aiShellExitCode = nil }
+            if !connected { aiControl.disconnected(); aiCommandCapture = AICommandCapture(); aiApplicationCursor = false; aiShellExitCode = nil }
             if connected != oldValue {
                 store.objectWillChange.send()
                 store.monitoring.connectionsChanged()
@@ -436,6 +438,11 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
         Task { try? await writer?.changeSize(cols: newCols, rows: newRows, pixelWidth: 0, pixelHeight: 0) }
     }
     func setTerminalTitle(source: TerminalView, title: String) { if host == nil && !title.isEmpty { self.title = title } }
+    /// Authenticated shell-hook metadata also supports shells without OSC 7 directory reports.
+    func updateShellDirectory(_ path: String) {
+        guard connected, let normalized = try? TerminalDirectoryBridge.normalizedPath(path) else { return }
+        currentDirectory = normalized
+    }
     func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
         guard source === terminal, connected else { return }
         if receiveCommandHistory(directory) { return }
@@ -465,6 +472,7 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
     }
     func writeInput(_ data: [UInt8]) {
         guard connected else { return }
+        aiControl.takeover(); store.takeOverAI(sessionID: id)
         aiTerminalInputRevision &+= 1
         let local = terminal as? LocalTerminal
         let bytes = ByteBuffer(bytes: data)
@@ -478,7 +486,13 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
         }
     }
     /// Preserve input ordering and report transport failures to the task agent.
-    func writeAgentInput(_ data: [UInt8], expectedRevision: UInt64? = nil, expectedCommand: String? = nil) async throws {
+    func waitForQueuedInput() async throws {
+        let request = generation, previous = inputTask
+        await previous?.value
+        try Task.checkCancellation()
+        guard connected, request == generation else { throw AppFailure.message("Terminal changed / 终端已变化") }
+    }
+    func writeAgentInput(_ data: [UInt8], expectedRevision: UInt64? = nil, expectedCommand: String? = nil, controlLease: UUID? = nil, expectedExecutionID: UUID? = nil) async throws {
         let previous = inputTask, startup = commandHistoryStartupTask, request = generation
         let local = terminal as? LocalTerminal, input = writer
         var failure: Error?
@@ -487,6 +501,8 @@ final class HostKeyCheck: NIOSSHClientServerAuthenticationDelegate, @unchecked S
                 await previous?.value; await startup?.value
                 try Task.checkCancellation()
                 guard connected, request == generation else { throw AppFailure.message("Terminal changed / 终端已变化") }
+                if let controlLease { try aiControl.validate(controlLease) }
+                if let expectedExecutionID, aiCommandCapture.current?.id != expectedExecutionID { throw AppFailure.message("Foreground program changed / 前台程序已变化") }
                 guard expectedRevision == nil || expectedRevision == aiTerminalInputRevision,
                       expectedCommand == nil || expectedCommand == aiShellInput.line else { throw AppFailure.message("Terminal input changed before execution / 执行前终端输入已变化，请重新检查命令。") }
                 aiShellInput.input(data)

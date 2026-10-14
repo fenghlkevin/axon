@@ -83,7 +83,7 @@ import XCTest
             try await Task.sleep(for:.milliseconds(200));try snapshot(host,"/tmp/axon-0160-ui/history-all-\(width).png")
             let choice=try XCTUnwrap(descendants(host).compactMap{$0 as? SelectionFieldButton}.first{$0.accessibilityIdentifier()=="axon-history-origin-filter"})
             choice.performClick(nil);try await Task.sleep(for:.milliseconds(100));let popup=try XCTUnwrap(AxonMenuPopover.active)
-            XCTAssertEqual(popup.menu.items.count,5);try snapshot(try XCTUnwrap(popup.popover.contentViewController?.view),"/tmp/axon-0160-ui/source-menu-\(width).png")
+            XCTAssertEqual(popup.menu.items.map(\.title), ["全部来源", "AI", "人工"]);try snapshot(try XCTUnwrap(popup.popover.contentViewController?.view),"/tmp/axon-0160-ui/source-menu-\(width).png")
             popup.highlighted=1;XCTAssertTrue(popup.handleKey(36));try await Task.sleep(for:.milliseconds(150));XCTAssertEqual(choice.title,"AI")
             try snapshot(host,"/tmp/axon-0160-ui/history-ai-\(width).png")
             // The chosen origin remains active when the backing history updates.

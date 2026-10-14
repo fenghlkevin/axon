@@ -4,6 +4,47 @@ import XCTest
 @testable import TabbyNative
 
 @MainActor final class PasswordVisibilityTests: XCTestCase {
+    func testEmptyPasswordClickShowsContrastingCaretInBothModes() async throws {
+        let state = FixtureState()
+        let (window, hosting, input) = try await show(state)
+        defer { window.close() }
+        window.appearance = NSAppearance(named: .darkAqua)
+        let previousPolicy = NSApp.activationPolicy()
+        NSApp.setActivationPolicy(.regular)
+        defer { NSApp.setActivationPolicy(previousPolicy) }
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        try await settle(hosting)
+        for revealed in [false, true] {
+            if revealed { input.visibilityButton.performClick(nil) }
+            window.makeFirstResponder(nil)
+            let point = input.convert(NSPoint(x: 8, y: 2), to: nil)
+            let event = try XCTUnwrap(NSEvent.mouseEvent(with: .leftMouseDown, location: point,
+                modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+            input.mouseDown(with: event)
+            try await settle(hosting)
+            let editor = try XCTUnwrap(input.activeField.currentEditor() as? NSTextView)
+            XCTAssertTrue(window.firstResponder === editor)
+            XCTAssertEqual(editor.insertionPointColor, NSColor(Palette.text))
+            if let directory = ProcessInfo.processInfo.environment["AXON_UI_CAPTURE_DIR"] {
+                let root = URL(fileURLWithPath: directory)
+                try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+                let bitmap = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
+                hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+                try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+                    .write(to: root.appendingPathComponent(revealed ? "caret-visible.png" : "caret-secure.png"))
+                let capture = Process()
+                capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+                capture.arguments = ["-x", "-l", String(window.windowNumber), root.appendingPathComponent(revealed ? "caret-visible-window.png" : "caret-secure-window.png").path]
+                try capture.run(); capture.waitUntilExit()
+            }
+            editor.insertText("x", replacementRange: editor.selectedRange())
+            try await settle(hosting)
+            XCTAssertEqual(state.password, "x")
+            editor.selectAll(nil); editor.deleteBackward(nil)
+        }
+    }
     func testDefaultHiddenRevealAndHideUseOneFieldAndClearTheReplacedField() async throws {
         let state = FixtureState(); state.password = "fixture-password"
         let (window, hosting, input) = try await show(state)

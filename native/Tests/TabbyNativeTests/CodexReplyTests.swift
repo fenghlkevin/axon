@@ -32,10 +32,11 @@ import XCTest
             for line in sys.stdin:
                 e=json.loads(line)
                 if e.get('method')=='initialize':emit({'id':1,'result':{}})
-                elif e.get('method')=='thread/start':emit({'id':2,'result':{'thread':{'id':'fixture'}}})
+                elif e.get('method')=='config/read':emit({'id':e['id'],'result':{'config':{'mcp_servers':{'external-fixture':{'enabled':True}}}}})
+                elif e.get('method')=='thread/start':emit({'id':e['id'],'result':{'thread':{'id':'fixture'}}})
                 elif e.get('method')=='turn/start':
                     n=int(counter.read_text())+1 if counter.exists() else 1
-                    counter.write_text(str(n));emit({'id':3,'result':{}})
+                    counter.write_text(str(n));emit({'id':e['id'],'result':{}})
                     if name=='error':emit({'method':'error','params':{'error':{'message':'fixture service error'},'willRetry':False}});continue
                     items=[]
                     if name=='delta':

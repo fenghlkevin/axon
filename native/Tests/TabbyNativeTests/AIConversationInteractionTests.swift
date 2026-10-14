@@ -24,7 +24,8 @@ import XCTest
         var policy=AIExecutionPolicy();policy.approvalMode = .everyTime
         policy.exactAllows=[AIExactPermission(target:"fixture",tool:"terminal_send",argument:"df -h",denied:true)]
         XCTAssertEqual(policy.decision(target:"fixture",tool:"terminal_execute",argument:"df -h",automatic:false),.deny)
-        policy.exactAllows?[0].denied=nil;XCTAssertEqual(policy.decision(target:"fixture",tool:"terminal_execute",argument:"df -h",automatic:false),.allow)
+        policy.exactAllows?[0].denied=nil;XCTAssertEqual(policy.decision(target:"fixture",tool:"terminal_execute",argument:"df -h",automatic:false),.ask)
+        policy.approvalMode = .assisted;XCTAssertEqual(policy.decision(target:"fixture",tool:"terminal_execute",argument:"df -h",automatic:false),.allow)
         policy.commandBlacklist="df .*";XCTAssertEqual(policy.decision(target:"fixture",tool:"terminal_execute",argument:"df -h",automatic:false),.deny)
     }
     func testGlobalExactRuleScopeAndCompatibility() throws {
@@ -33,6 +34,8 @@ import XCTest
         policy.exactAllows=[AIExactPermission(target:"original",tool:"terminal_send",argument:"pwd && ls -la",hostID:original)]
         XCTAssertEqual(policy.decision(target:"other",tool:"terminal_execute",argument:"pwd && ls -la",automatic:false,hostID:other),.ask)
         policy.exactAllows?[0].global=true
+        XCTAssertEqual(policy.decision(target:"other",tool:"terminal_execute",argument:"pwd && ls -la",automatic:false,hostID:other),.ask)
+        policy.approvalMode = .assisted
         let saved=try JSONDecoder().decode(AIExecutionPolicy.self,from:JSONEncoder().encode(policy))
         XCTAssertEqual(saved.decision(target:"other",tool:"terminal_execute",argument:"pwd && ls -la",automatic:false,hostID:other),.allow)
         XCTAssertEqual(saved.decision(target:"other",tool:"terminal_execute",argument:"pwd && ls -la /",automatic:false,hostID:other),.ask)
@@ -42,7 +45,7 @@ import XCTest
         XCTAssertEqual(policy.decision(target:"other",tool:"terminal_execute",argument:"pwd && ls -la",automatic:false,hostID:other),.ask)
         XCTAssertEqual(policy.exactAllows?.first?.hostID,original)
     }
-    func testApprovedInputAndReturnShareOneAuthorization() async throws {
+    func testUnknownShellRefusesApprovedInputWithoutExecuting() async throws {
         _ = NSApplication.shared
         let attribute=NSAccessibility.Attribute(rawValue:"AXEnhancedUserInterface");NSApp.accessibilitySetValue(true,forAttribute:attribute)
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString);try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true);defer{try? FileManager.default.removeItem(at:root)}
@@ -52,14 +55,14 @@ import XCTest
         let terminal=LocalTerminal(frame:NSRect(x:0,y:0,width:600,height:400));owned.terminal=terminal;terminal.ownerSession=owned;terminal.terminalDelegate=owned
         terminal.startProcess(executable:"/bin/bash",args:["--noprofile","--norc","-i"],environment:["PATH=/usr/bin:/bin","TERM=xterm-256color","PS1=FIXTURE> "],currentDirectory:root.path);defer{terminal.terminate()};try await Task.sleep(for:.milliseconds(200))
         var round=0
-        let ai=AIAssistant(fileURL:root.appendingPathComponent("ai.json"),modelResponder:{_,_,_ in round += 1; if round > 2{return "done"};return "```axon_action\n{\"tool\":\"" + (round == 1 ? "terminal_send" : "terminal_key") + "\",\"argument\":\"" + (round == 1 ? "printf approved_pair" : "enter") + "\",\"reason\":\"fixture\"}\n```" })
+        let ai=AIAssistant(fileURL:root.appendingPathComponent("ai.json"),modelResponder:{_,_,_ in round += 1; if round > 2{return "```axon_action\n{\"tool\":\"report_blocker\",\"argument\":\"No hook in fixture shell\",\"reason\":\"fixture\"}\n```"};return try p0FixtureReply("```axon_action\n{\"tool\":\"" + (round == 1 ? "terminal_send" : "terminal_key") + "\",\"argument\":\"" + (round == 1 ? "printf approved_pair" : "enter") + "\",\"reason\":\"fixture\"}\n```", goal: "test") })
         ai.executionChannel = .currentTerminal
         let executor=AICommandExecutor(sessionID:owned.id,source:"fixture",directory:"/tmp",valid:{owned.connected},execute:{_,_ in XCTFail("independent");return AICommandResult(output:"",exitCode:0)});executor.terminalBridge=AITerminalBridge(session:owned)
         ai.prepare(source:"fixture",text:"",sessionID:owned.id,question:"test");ai.send(executor:executor)
         for _ in 0..<200 {if ai.pendingApproval != nil{break};try await Task.sleep(for:.milliseconds(10))}
         XCTAssertEqual(ai.pendingTool,"terminal_send");ai.approveAction()
         for _ in 0..<300 {if !ai.busy || ai.pendingApproval != nil{break};try await Task.sleep(for:.milliseconds(10))}
-        XCTAssertNil(ai.pendingApproval);XCTAssertFalse(ai.busy);XCTAssertTrue(ai.error.isEmpty,ai.error);XCTAssertEqual(ai.steps.last?.tool,"terminal_execute")
+        XCTAssertNil(ai.pendingApproval);XCTAssertFalse(ai.busy);XCTAssertTrue(ai.error.contains("Terminal state unknown"),ai.error);XCTAssertEqual(ai.steps.last?.tool,"terminal_send")
     }
     func testCompactComposerAndTogglePreviewRendered() async throws {
         _ = NSApplication.shared
@@ -100,7 +103,7 @@ import XCTest
         var round=0
         let ai=AIAssistant(fileURL:root.appendingPathComponent("ai.json"),modelResponder:{_,_,_ in
             round += 1
-            if round == 3 { return "```axon_action\n{\"tool\":\"command\",\"argument\":\"printf fixture\",\"reason\":\"fixture\"}\n```" }
+            if round == 3 { return try p0FixtureReply("```axon_action\n{\"tool\":\"command\",\"argument\":\"cat /owned/fixture\",\"reason\":\"fixture\"}\n```", goal: "permission fixture") }
             return "fixture answer"
         });store.ai=ai
         let executor=AICommandExecutor(sessionID:session.id,source:"Local macOS / 本机 macOS",directory:"/tmp",valid:{true},execute:{_,_ in AICommandResult(output:"Darwin\n/tmp",exitCode:0)})
@@ -175,7 +178,7 @@ import XCTest
         var round = 0
         let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { _,_,_ in
             round += 1
-            if round <= 14 { return "```axon_action\n{\"tool\":\"verify_command\",\"argument\":\"printf fixture\",\"reason\":\"检查文件内容及执行结果，第 " + String(round) + " 步\"}\n```" }
+            if round <= 14 { return "```axon_action\n{\"tool\":\"verify_command\",\"argument\":\"cat /owned/fixture-" + String(round) + "\",\"reason\":\"检查文件内容及执行结果，第 " + String(round) + " 步\"}\n```" }
             return "已在 nohup.out 末尾追加一行 test ai init，并核验文件内容，原有内容保留。"
         })
         var policy = AIExecutionPolicy(); policy.approvalMode = .fullAccess; ai.settings.executionPolicy = policy; store.ai = ai
@@ -183,6 +186,7 @@ import XCTest
         ai.prepare(source: executor.source, text: "fixture", sessionID: session.id, question: "帮我打开 nohup.out，补充一行 test ai init"); ai.send(executor: executor)
         for _ in 0..<300 { if !ai.busy { break }; try await Task.sleep(for: .milliseconds(10)) }
         XCTAssertFalse(ai.busy); XCTAssertEqual(ai.steps.count, 15)
+        ai.steps[3] = AIAgentStep(command: "sleep 3; printf ready", reason: "等待当前命令完成，按执行编号读取结果", state: "running", tool: "terminal_execute", input: "sleep 3; printf ready")
         try FileManager.default.createDirectory(atPath: "/tmp/axon-0171-ui", withIntermediateDirectories: true)
         for width in [320, 600] {
             let host = NSHostingView(rootView: AIAssistantPane(ai: ai, terminal: true, availableHeight: 900).environmentObject(store).frame(width: CGFloat(width), height: 900)); host.sizingOptions = []

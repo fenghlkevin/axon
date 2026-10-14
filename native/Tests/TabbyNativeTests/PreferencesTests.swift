@@ -168,5 +168,45 @@ final class PreferencesTests: XCTestCase {
         }
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path), "Opening or browsing settings never saves a draft")
     }
+    @MainActor func testTerminalSettingsApplyWithoutSaveAndKeepEditingFocus() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = AppStore(fileURL: root.appendingPathComponent("workspace.json"))
+        let session = TerminalSession(host: nil, store: store)
+        let terminal = RemoteTerminal(frame: .zero, options: .default)
+        session.terminal = terminal; store.sessions = [session]
+        for width in [1050, 1400] {
+            let hosting = NSHostingView(rootView: PreferencesView(page: .terminal).environmentObject(store).preferredColorScheme(.light))
+            hosting.sizingOptions = []
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 760), styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false; window.contentView = hosting; window.makeKeyAndOrderFront(nil)
+            try await Task.sleep(for: .milliseconds(200))
+            let editor = try XCTUnwrap(find(TerminalFontSizeNativeEditor.self, in: hosting).first)
+            editor.increase.performClick(nil)
+            try await Task.sleep(for: .milliseconds(120))
+            XCTAssertEqual(terminal.font.pointSize, store.workspace.preferences.fontSize)
+            XCTAssertEqual(try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: store.fileURL)).preferences.fontSize, store.workspace.preferences.fontSize)
+            window.makeFirstResponder(editor.field)
+            editor.field.stringValue = "5"
+            editor.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: editor.field))
+            let previous = store.workspace.preferences.fontSize
+            try await Task.sleep(for: .milliseconds(100))
+            XCTAssertEqual(store.workspace.preferences.fontSize, previous)
+            editor.field.stringValue = "25"
+            editor.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: editor.field))
+            try await Task.sleep(for: .milliseconds(120))
+            XCTAssertEqual(store.workspace.preferences.fontSize, 25)
+            XCTAssertEqual(terminal.font.pointSize, 25)
+            XCTAssertTrue(find(TerminalFontSizeNativeEditor.self, in: hosting).first === editor, "Auto-save must not recreate the focused input")
+            if let path = ProcessInfo.processInfo.environment["AXON_UI_CAPTURE_DIR"] {
+                hosting.layoutSubtreeIfNeeded()
+                let bitmap = try XCTUnwrap(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
+                hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+                try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: path).appendingPathComponent("preferences-auto-terminal-\(width).png"))
+            }
+            window.close()
+        }
+    }
     @MainActor private func find<T: NSView>(_ type: T.Type, in view: NSView) -> [T] { ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap { find(type, in: $0) } }
 }

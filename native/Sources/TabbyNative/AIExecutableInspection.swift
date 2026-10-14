@@ -4,7 +4,7 @@ enum AIExecutableInspection {
     enum Code: Equatable { case shell(String), file(String, String) }
     static let shells = ["sh", "bash", "dash", "zsh", "ksh"]
     static let interpreters = shells + ["python", "python3", "node", "perl", "ruby", "php", "lua"]
-    static let inspectableCommands: Set<String> = ["uptime", "vmstat", "iostat", "mpstat", "sar", "lsblk", "blkid", "findmnt", "mountpoint", "hostnamectl", "getent", "netstat", "who", "w", "dmesg", "getenforce", "sestatus", "echo", "printf", "pwd", "ls", "cat", "head", "tail", "grep", "egrep", "fgrep", "wc", "sort", "uniq", "cut", "tr", "date", "uname", "hostname", "id", "whoami", "ps", "ss", "lsof", "free", "df", "du", "stat", "file", "test", "[", "true", "false", "sleep", "cd", "mkdir", "touch", "cp", "mv", "chmod", "chown", "chgrp", "setfacl", "tee", "install", "sed", "awk", "gawk", "find", "readlink", "realpath", "which", "command", "type", "hash", "exit", "return", "export", "set", "unset", "shift", "umask", "read", "systemctl", "docker", "docker-compose", "apt", "apt-get", "yum", "dnf", "fdisk", "parted", "sfdisk", "sgdisk", "ip", "iptables", "nft", "ufw", "firewall-cmd", "kill", "pkill", "killall", "curl", "wget", "dig", "nslookup", "ping", "nc", "vim", "vi", "less", "more", "top", "htop", "mysql", "psql", "sqlite3", "journalctl", "env"]
+    static let inspectableCommands: Set<String> = ["od", "uptime", "vmstat", "iostat", "mpstat", "sar", "lsblk", "blkid", "findmnt", "mountpoint", "hostnamectl", "getent", "netstat", "who", "w", "dmesg", "getenforce", "sestatus", "echo", "printf", "pwd", "ls", "cat", "head", "tail", "grep", "egrep", "fgrep", "wc", "sort", "uniq", "cut", "tr", "date", "uname", "hostname", "id", "whoami", "ps", "ss", "lsof", "free", "df", "du", "stat", "file", "test", "[", "true", "false", "sleep", "cd", "mkdir", "touch", "cp", "mv", "chmod", "chown", "chgrp", "setfacl", "tee", "install", "sed", "awk", "gawk", "find", "readlink", "realpath", "which", "command", "type", "hash", "exit", "return", "export", "set", "unset", "shift", "umask", "read", "systemctl", "docker", "docker-compose", "apt", "apt-get", "yum", "dnf", "fdisk", "parted", "sfdisk", "sgdisk", "ip", "iptables", "nft", "ufw", "firewall-cmd", "kill", "pkill", "killall", "curl", "wget", "dig", "nslookup", "ping", "nc", "vim", "vi", "less", "more", "top", "htop", "mysql", "psql", "sqlite3", "journalctl", "env"]
     static func failure() -> AppFailure { .message("Executable code cannot be reliably inspected; download to a plain script file or use an explicit literal shell command. / 无法可靠检查执行代码；请先保存为普通脚本文件，或使用明确的字面量 Shell 命令。") }
 
     /// Small conservative lexer, not a shell evaluator. Dynamic execution is rejected.
@@ -38,6 +38,12 @@ enum AIExecutableInspection {
             if name == "find", words.contains(where: { ["-exec", "-execdir", "-ok", "-okdir"].contains($0) }) { throw failure() }
             if ["docker", "docker-compose"].contains(name), words.contains(where: { ["run", "exec", "build", "up"].contains($0) }) { throw failure() }
             if ["mysql", "psql", "sqlite3"].contains(name), command.contains("<") || words.contains(where: { ["-f", "--file", ".read", "source", "SOURCE"].contains($0) || $0.contains("\\!") || $0.contains("\\i") || $0.contains(".shell") || $0.contains(".read") || $0.uppercased().contains("SOURCE ") }) { throw failure() }
+            // An isolated interactive Python starts without profile/site startup code.
+            // Every subsequent input still goes through programCommand and deny rules.
+            if ["python", "python3"].contains(name), Array(words.dropFirst()) == ["-I", "-S", "-q"] {
+                guard try segments(command).count == 1, !command.contains(where: { "|;&<>$`".contains($0) }) else { throw failure() }
+                continue
+            }
             if interpreters.contains(name) || ["source", "."].contains(name) {
                 guard words.count >= 2, !command.contains("<<"), !command.contains("$("), !command.contains("`"), !command.contains("|") else { throw failure() }
                 let arg = words[1]
@@ -52,7 +58,7 @@ enum AIExecutableInspection {
             } else if executable.hasPrefix("./") || executable.hasPrefix("../") || ["sh", "py", "js", "pl", "rb", "php", "lua"].contains(URL(fileURLWithPath: executable).pathExtension) || (executable.hasPrefix("/") && !executable.hasPrefix("/bin/") && !executable.hasPrefix("/usr/bin/") && !executable.hasPrefix("/sbin/") && !executable.hasPrefix("/usr/sbin/")) {
                 guard !executable.contains("$"), !executable.contains("<") else { throw failure() }
                 result.append(.file(executable, "direct"))
-            } else if !inspectableCommands.contains(name) { throw failure() }
+            } else if executable.contains("$") { throw failure() }
         }
         if !result.isEmpty, try segments(command).contains(where: { $0.first == "cd" }) { throw failure() }
         return result
@@ -61,13 +67,13 @@ enum AIExecutableInspection {
     static func programCommand(_ input: String, program: String, insertMode: Bool) throws -> String? {
         let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
         let names = (try? segments(program).prefix(1).compactMap { $0.first }.map { URL(fileURLWithPath: $0).lastPathComponent }) ?? []
-        if names.contains("vim") || names.contains("vi") {
-            if insertMode { return nil } // Enter inserts a line; it does not execute script code.
-            if value.hasPrefix(":!") { return String(value.dropFirst(2)) }
-            if value.range(of: "^:(?:wq|w|q|x|write|quit)!?$", options: .regularExpression) != nil { return nil }
-            throw failure() // Vim :source/:lua/:python/:execute need their own analyzers.
-        }
+        if AIBuiltInDeny.editorCommand(program) { throw failure() }
         if ["mysql", "psql", "sqlite3"].contains(where: names.contains), value.range(of: "^(?:SELECT\\s+(?:[0-9]+|\\*\\s+FROM\\s+[A-Za-z_][A-Za-z0-9_]*)(?:\\s+LIMIT\\s+[0-9]+)?|SHOW\\s+TABLES);?$", options: [.regularExpression, .caseInsensitive]) != nil { return nil }
+        if ["mysql", "psql", "sqlite3"].contains(where: names.contains), value == ".quit", names.contains("sqlite3") { return nil }
+        if names.contains("python") || names.contains("python3") {
+            if ["exit()", "quit()", "raise SystemExit"].contains(value) { return nil }
+            if value.range(of: #"^print\([0-9. +*/%()\-]+\)$"#, options: .regularExpression) != nil { return nil }
+        }
         if names.contains("python") || names.contains("python3"), value.range(of: "^print\\((?:[0-9]+|'[^'\\\\]*'|\"[^\"\\\\]*\")\\)$", options: .regularExpression) != nil { return nil }
         throw failure()
     }

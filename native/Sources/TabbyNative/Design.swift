@@ -39,18 +39,39 @@ struct IconButtonStyle: ButtonStyle {
     }
 }
 struct WorkspaceMenuItemStyle: ButtonStyle {
+    var selected = false
+    var background: Color = .clear
     func makeBody(configuration: Configuration) -> some View {
-        WorkspaceMenuItemBody(label: configuration.label, pressed: configuration.isPressed)
+        WorkspaceMenuItemBody(label: configuration.label, pressed: configuration.isPressed, selected: selected, base: background)
     }
 }
 private struct WorkspaceMenuItemBody<Label: View>: View {
     let label: Label
     let pressed: Bool
+    let selected: Bool
+    let base: Color
     @State private var hovering = false
     var body: some View {
-        label.contentShape(Rectangle()).background(hovering || pressed ? Palette.selected : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: 8)).onHover { hovering = $0 }
+        label.contentShape(Rectangle()).background(selected || hovering || pressed ? Palette.selected : base)
+            .clipShape(RoundedRectangle(cornerRadius: 8)).background(AxonHoverRegion(hovering: $hovering))
     }
+}
+/// Transparent tracking keeps the entire row responsive without intercepting clicks.
+private struct AxonHoverRegion: NSViewRepresentable {
+    @Binding var hovering: Bool
+    func makeNSView(context: Context) -> AxonHoverTrackingView { AxonHoverTrackingView() }
+    func updateNSView(_ view: AxonHoverTrackingView, context: Context) { view.changed = { hovering = $0 } }
+}
+final class AxonHoverTrackingView: NSView {
+    var changed: (Bool) -> Void = { _ in }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    override func mouseEntered(with event: NSEvent) { changed(true) }
+    override func mouseExited(with event: NSEvent) { changed(false) }
 }
 struct WorkspaceIconStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

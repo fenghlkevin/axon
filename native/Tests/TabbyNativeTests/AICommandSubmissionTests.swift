@@ -57,8 +57,8 @@ import XCTest
             var round=0
             let ai=AIAssistant(fileURL:root.appendingPathComponent(mode+".json"),modelResponder:{ _,_,_ in
                 round += 1
-                if round <= 2 { return "```axon_action\n{\"tool\":\"" + (round == 1 ? "terminal_send" : "terminal_key") + "\",\"argument\":\"" + (round == 1 ? "printf SUBMISSION_FIXTURE" : "enter") + "\",\"reason\":\"fixture\"}\n```" }
-                return "done"
+                if round <= 2 { return try p0FixtureReply("```axon_action\n{\"tool\":\"" + (round == 1 ? "terminal_send" : "terminal_key") + "\",\"argument\":\"" + (round == 1 ? "printf SUBMISSION_FIXTURE" : "enter") + "\",\"reason\":\"fixture\"}\n```", goal: "fixture", tool: "verify_command", argument: "cat /owned/verification", expected: "SUBMISSION_FIXTURE") }
+                return "```axon_action\n{\"tool\":\"report_blocker\",\"argument\":\"Fixture shell has no completion hook\",\"reason\":\"fixture\"}\n```"
             })
             var policy=AIExecutionPolicy(); policy.approvalMode = .assisted
             if mode == "ask" || mode == "edited" { policy.rules="ask|.*|terminal_execute|.*" }

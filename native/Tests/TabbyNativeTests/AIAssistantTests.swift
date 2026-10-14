@@ -96,11 +96,11 @@ import XCTest
             if effort.isEnabled {
                 effort.performClick(nil); try await settle(host); let popup = try XCTUnwrap(AxonMenuPopover.active)
                 let index = try XCTUnwrap(popup.menu.items.firstIndex { $0.title == "中" })
-                popup.highlighted = index; XCTAssertTrue(popup.handleKey(36)); try await settle(host)
+                popup.highlighted = index; XCTAssertTrue(popup.handleKey(36)); try await Task.sleep(for: .milliseconds(450)); try await settle(host)
                 XCTAssertEqual(store.ai.settings.codexReasoningEffort, "medium")
                 XCTAssertEqual(AIAssistant(fileURL: root.appendingPathComponent("ai-settings.json")).settings.codexReasoningEffort, "medium")
                 effort.performClick(nil); try await settle(host); let restore = try XCTUnwrap(AxonMenuPopover.active)
-                restore.highlighted = try XCTUnwrap(restore.menu.items.firstIndex { $0.title == "高" }); XCTAssertTrue(restore.handleKey(36)); try await settle(host)
+                restore.highlighted = try XCTUnwrap(restore.menu.items.firstIndex { $0.title == "高" }); XCTAssertTrue(restore.handleKey(36)); try await Task.sleep(for: .milliseconds(450)); try await settle(host)
             }
             window.close()
             let loaded = AIAssistant(fileURL: root.appendingPathComponent("ai-settings.json"))
@@ -204,7 +204,7 @@ import XCTest
             for tab in tabs { XCTAssertGreaterThan(tab.frame.width, 30); XCTAssertEqual(tab.frame.height, 48, accuracy: 1) }
             // Exercise the real custom provider popover.
             if let provider = descendants(host).compactMap({ $0 as? NSButton }).first(where: { $0.accessibilityIdentifier() == "axon-ai-provider" }) {
-                provider.performClick(nil); try await settle(host)
+                provider.scrollToVisible(provider.bounds); try await settle(host); provider.performClick(nil); try await settle(host)
                 let popover = try XCTUnwrap(AxonMenuPopover.active)
                 try snapshot(try XCTUnwrap(popover.popover.contentViewController?.view), path: "\(directory)/provider-\(width).png")
                 XCTAssertEqual(popover.menu.items.filter { $0.state == .on }.count, 1)
@@ -250,11 +250,11 @@ import XCTest
         for width in [1050, 1400] {
             for backend in AIBackend.allCases {
                 store.ai.settings = AISettings(); store.ai.settings.backend = backend
-                let host = NSHostingView(rootView: MainView().environmentObject(store))
+                let host = NSHostingView(rootView: MainView().environmentObject(store)); host.sizingOptions = []
                 let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: 760), styleMask: [.titled], backing: .buffered, defer: false); window.isReleasedWhenClosed = false; window.contentView = host; window.orderFront(nil)
                 try await settle(host); try snapshot(host, path: "/tmp/axon-ai-ui/settings-\(backend.rawValue)-\(width).png")
                 let provider = try XCTUnwrap(descendants(host).compactMap { $0 as? NSButton }.first { $0.accessibilityIdentifier() == "axon-ai-provider" })
-                provider.performClick(nil); try await settle(host)
+                provider.scrollToVisible(provider.bounds); try await settle(host); provider.performClick(nil); try await settle(host)
                 let popover = try XCTUnwrap(AxonMenuPopover.active)
                 XCTAssertEqual(popover.menu.items.count, 3)
                 XCTAssertEqual(popover.menu.items.first { $0.state == .on }?.title, backend.title)
@@ -262,29 +262,25 @@ import XCTest
                 if backend == .codex {
                     for identifier in ["axon-ai-codex-model", "axon-ai-codex-effort", "axon-ai-codex-speed"] {
                         let button = try XCTUnwrap(descendants(host).compactMap { $0 as? NSButton }.first { $0.accessibilityIdentifier() == identifier })
-                        button.performClick(nil); try await settle(host)
+                        button.scrollToVisible(button.bounds); try await settle(host); button.performClick(nil); try await settle(host)
                         let choices = try XCTUnwrap(AxonMenuPopover.active)
                         XCTAssertEqual(choices.menu.items.filter { $0.state == .on }.count, 1)
                         try snapshot(try XCTUnwrap(choices.popover.contentViewController?.view), path: "/tmp/axon-ai-ui/\(identifier)-\(width).png")
                         XCTAssertTrue(choices.handleKey(125)); XCTAssertTrue(choices.handleKey(36)); try await settle(host)
                     }
-                    let save = try XCTUnwrap(accessible(host).first { read($0, "accessibilityIdentifier") as? String == "axon-ai-save" })
-                    let action = NSSelectorFromString("accessibilityPerformPress")
-                    typealias Press = @convention(c) (AnyObject, Selector) -> Bool
-                    XCTAssertTrue(unsafeBitCast(save.method(for: action), to: Press.self)(save, action))
-                    try await settle(host)
+                    try await Task.sleep(for: .milliseconds(450))
                     XCTAssertEqual(store.ai.settings.codexReasoningEffort, "low")
                     XCTAssertEqual(store.ai.settings.codexServiceTier, "default")
                     let persisted = AIAssistant(fileURL: root.appendingPathComponent("ai-settings.json"))
                     XCTAssertEqual(persisted.settings.codexReasoningEffort, "low")
                     try snapshot(host, path: "/tmp/axon-ai-ui/configured-codex-\(width).png")
                     let modelButton = try XCTUnwrap(descendants(host).compactMap { $0 as? NSButton }.first { $0.accessibilityIdentifier() == "axon-ai-codex-model" })
-                    modelButton.performClick(nil); try await settle(host)
+                    modelButton.scrollToVisible(modelButton.bounds); try await settle(host); modelButton.performClick(nil); try await settle(host)
                     let modelMenu = try XCTUnwrap(AxonMenuPopover.active)
                     XCTAssertTrue(modelMenu.handleKey(126)); XCTAssertTrue(modelMenu.handleKey(36)); try await settle(host)
-                    XCTAssertTrue(unsafeBitCast(save.method(for: action), to: Press.self)(save, action)); try await settle(host)
+                    try await Task.sleep(for: .milliseconds(450)); try await settle(host)
                     XCTAssertEqual(store.ai.settings.codexModel, "")
-                    XCTAssertEqual(store.ai.settings.codexReasoningEffort, "low"); XCTAssertEqual(store.ai.settings.codexServiceTier, "default")
+                    XCTAssertNil(store.ai.settings.codexReasoningEffort); XCTAssertNil(store.ai.settings.codexServiceTier)
                 }
                 window.close()
             }
@@ -306,5 +302,5 @@ import XCTest
     }
     private func settle(_ view: NSView) async throws { view.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(250)); view.layoutSubtreeIfNeeded() }
     private func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
-    private func snapshot(_ view: NSView, path: String) throws { let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds)); view.cacheDisplay(in: view.bounds, to: rep); try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: path)) }
+    private func snapshot(_ view: NSView, path: String) throws { let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds), path + " bounds=" + NSStringFromRect(view.bounds)); view.cacheDisplay(in: view.bounds, to: rep); try XCTUnwrap(rep.representation(using: .png, properties: [:])).write(to: URL(fileURLWithPath: path)) }
 }

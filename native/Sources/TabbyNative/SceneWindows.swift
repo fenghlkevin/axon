@@ -70,11 +70,15 @@ enum SceneWorkspaceMerge {
         controller.showWindow(nil); controller.window?.makeKeyAndOrderFront(nil)
         return controller
     }
+    static func activateAIWindow(for store: AppStore) {
+        if let controller = windows.values.first(where: { $0.store === store }) { controller.window?.makeKeyAndOrderFront(nil) }
+        else { NSApp.windows.first(where: { $0.title == "Axon" })?.makeKeyAndOrderFront(nil) }
+    }
     static func closeFocused() { windows.values.first { $0.store === focusedStore }?.close() }
     static func closeAll() { for controller in Array(windows.values) { controller.close() } }
     private init(definition: WorkScene, owner: AppStore, key: String) throws {
         self.parentStore = owner; baseline = owner.workspace; sceneID = definition.id; registryKey = key
-        store = AppStore(fileURL: owner.fileURL); store.workspace = owner.workspace; store.sceneWindowID = definition.id; store.sceneWindowOwner = owner
+        store = AppStore(fileURL: owner.fileURL, aiNamespace: definition.id); store.workspace = owner.workspace; store.sceneWindowID = definition.id; store.sceneWindowOwner = owner
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800), styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         super.init(window: window)
         window.isMovableByWindowBackground = false
@@ -114,7 +118,7 @@ enum SceneWorkspaceMerge {
     required init?(coder: NSCoder) { fatalError("Unsupported") }
     func windowWillClose(_ notification: Notification) {
         guard !cleaned else { return }; cleaned = true
-        openingTabs?.cancel(); changes?.cancel(); store.closeScene(sceneID); store.batchTasks.cancelAll(); store.externalEdits.edits.forEach { $0.stop() }; store.monitoring.stop(); store.automaticBackup.cancel()
+        openingTabs?.cancel(); changes?.cancel(); store.aiSessions.forEach { $0.cancel() }; store.closeScene(sceneID); store.batchTasks.cancelAll(); store.externalEdits.edits.forEach { $0.stop() }; store.monitoring.stop(); store.automaticBackup.cancel()
         for id in Array(store.forwardTasks.keys) { store.stopForward(id) }
         for session in Array(store.sessions) { store.close(session.id) }
         for log in Array(store.logViewers) { store.closeLogViewer(log.id) }

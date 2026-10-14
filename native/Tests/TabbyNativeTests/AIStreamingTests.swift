@@ -10,12 +10,14 @@ import XCTest
         try chat.line(#"data: {"choices":[{"delta":{"content":"你好"}}]}"#, backend: .chatgpt); try chat.line("", backend: .chatgpt)
         XCTAssertEqual(chat.text, "你好"); XCTAssertThrowsError(try chat.result())
         try chat.line(#"data: {"choices":[{"delta":{"content":"，世界"}}]}"#, backend: .chatgpt); try chat.line("", backend: .chatgpt)
+        try chat.line(#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#, backend: .chatgpt); try chat.line("", backend: .chatgpt)
         try chat.line("data: [DONE]", backend: .chatgpt); try chat.line("", backend: .chatgpt)
         XCTAssertEqual(try chat.result(), "你好，世界")
         var claude = AIStreamEvents()
         try claude.line(#"data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"private"}}"#, backend: .claude); try claude.line("", backend: .claude)
         XCTAssertTrue(claude.text.isEmpty)
         try claude.line(#"data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"你好"}}"#, backend: .claude); try claude.line("", backend: .claude)
+        try claude.line(#"data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}"#, backend: .claude); try claude.line("", backend: .claude)
         try claude.line(#"data: {"type":"message_stop"}"#, backend: .claude); try claude.line("", backend: .claude)
         XCTAssertEqual(try claude.result(), "你好")
         var failed = AIStreamEvents(); try failed.line(#"data: {"error":{"message":"failed"}}"#, backend: .chatgpt)
@@ -40,14 +42,17 @@ import XCTest
                 def send(event):
                     self.wfile.write(('data: '+json.dumps(event,ensure_ascii=False)+'\n\n').encode('utf-8')); self.wfile.flush()
                 if self.path=='/claude':
+                    send({'type':'message_start','message':{'usage':{'input_tokens':100,'output_tokens':0,'cache_read_input_tokens':20}}})
                     send({'type':'content_block_delta','delta':{'type':'text_delta','text':'你好'}})
                     time.sleep(1.5)
                     send({'type':'content_block_delta','delta':{'type':'text_delta','text':'，世界'}})
+                    send({'type':'message_delta','delta':{'stop_reason':'end_turn'},'usage':{'output_tokens':10}})
                     send({'type':'message_stop'})
                 else:
                     send({'choices':[{'delta':{'content':'你好'}}]})
                     time.sleep(1.5)
                     send({'choices':[{'delta':{'content':'，世界'},'finish_reason':'stop'}]})
+                    send({'choices':[],'usage':{'prompt_tokens':120,'completion_tokens':10}})
                     self.wfile.write(b'data: [DONE]\n\n'); self.wfile.flush()
         server=http.server.HTTPServer(('127.0.0.1',0),Handler)
         from pathlib import Path
@@ -73,7 +78,7 @@ import XCTest
             let window = NSWindow(contentRect:NSRect(x:0,y:0,width:760,height:640),styleMask:[.titled],backing:.buffered,defer:false); window.isReleasedWhenClosed = false; window.contentView = host; window.orderFront(nil)
             try await Task.sleep(for: .milliseconds(100)); host.layoutSubtreeIfNeeded(); try snapshot(host,path:"/tmp/axon-ai-wide-ui/stream-\(backend.rawValue).png")
             for _ in 0..<150 { if !ai.busy { break }; try await Task.sleep(for: .milliseconds(20)) }
-            XCTAssertFalse(ai.busy); XCTAssertEqual(ai.answer, "你好，世界", ai.error); XCTAssertTrue(ai.error.isEmpty)
+            XCTAssertFalse(ai.busy); XCTAssertEqual(ai.answer, "你好，世界", ai.error); XCTAssertTrue(ai.error.isEmpty); XCTAssertEqual(ai.usage.tokens.total,130); XCTAssertEqual(ai.usage.unknown,0)
             window.close()
         }
     }

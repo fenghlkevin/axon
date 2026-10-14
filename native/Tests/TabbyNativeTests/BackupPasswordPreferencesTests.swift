@@ -73,7 +73,6 @@ import XCTest
         try await settle(hosting)
         try await exercisePasswordEdits(password, in: window, hosting: hosting) { valid in
             try self.assertEnabled(valid, identifier: "axon-cloud-upload", in: hosting)
-            try self.assertEnabled(true, identifier: "axon-cloud-save", in: hosting)
             try self.assertEnabled(true, identifier: "axon-cloud-download", in: hosting)
         }
         try edit(password, replacingWith: "12345678", in: window)
@@ -85,7 +84,6 @@ import XCTest
         for identifier in ["axon-cloud-upload", "axon-cloud-download"] {
             try assertEnabled(false, identifier: identifier, in: hosting)
         }
-        try assertEnabled(true, identifier: "axon-cloud-save", in: hosting)
         // Editing saves configuration locally, but never transfers a backup.
         XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.store.fileURL.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: CloudConnectionPersistence.url(workspaceURL: fixture.store.fileURL).path))

@@ -106,6 +106,8 @@ struct FilePaneView: View {
     var onCompare: (() -> Void)? = nil
     @State var editingPath = ""
     @State var editingFile: FileEntry?
+    @State private var backupFile: FileEntry?
+    @State private var developmentPresented = false
     @State private var showingFilter = false
     @State private var editingLocation = false
     @FocusState private var locationFocused: Bool
@@ -131,6 +133,7 @@ struct FilePaneView: View {
                 }
                 AppActionMenu {
                     if let onCompare { Button(action: onCompare) { Label(compareTitle, systemImage: "arrow.left.arrow.right") }.disabled(!model.canTransfer) }
+                    if !endpointIsRemote { Button { developmentPresented = true } label: { Label(store.text("Development tools…", "开发工具…"), systemImage: "chevron.left.forwardslash.chevron.right") }.accessibilityIdentifier("axon-file-development") }
                     Button(action: refreshPane) { Label(store.text("Refresh", "刷新"), systemImage: "arrow.clockwise") }
                     Button { Task { await pane.up() } } label: { Label(store.text("Parent folder", "上级目录"), systemImage: "arrow.up") }
                     Divider()
@@ -143,7 +146,7 @@ struct FilePaneView: View {
                 } label: {
                     if toolbar.compact { Image(systemName: "ellipsis").frame(width: 28, height: 28) }
                     else { Text(store.text("Actions", "操作")).padding(.horizontal, 6).frame(height: 32).contentShape(Rectangle()) }
-                }.menuStyle(.borderlessButton).menuIndicator(toolbar.compact ? .hidden : .visible).fixedSize().tint(Palette.text).help(store.text("Actions", "操作")).accessibilityLabel(store.text("Actions", "操作"))
+                }.menuStyle(.borderlessButton).menuIndicator(toolbar.compact ? .hidden : .visible).fixedSize().tint(Palette.text).help(store.text("Actions", "操作")).accessibilityLabel(store.text("Actions", "操作")).accessibilityIdentifier(remote ? "axon-file-actions-right" : "axon-file-actions-local")
                 if let onCompare {
                     Button(action: onCompare) { Image(systemName: "arrow.left.arrow.right.square") }
                         .buttonStyle(IconButtonStyle()).disabled(!model.canTransfer).help(compareTitle).accessibilityLabel(compareTitle)
@@ -193,6 +196,8 @@ struct FilePaneView: View {
         }.frame(width: geometry.size.width, height: geometry.size.height).background(Palette.background)
         .modifier(FilePaneErrorOverlay(pane: pane, width: geometry.size.width))
         }.onAppear { editingPath = pane.path }.onChange(of: pane.path) { _, path in editingPath = path }
+        .sheet(isPresented: $developmentPresented) { GitWorkspaceSheet(directory: pane.path, registry: store.fileURL.deletingLastPathComponent().appendingPathComponent("git-worktrees.json")) { path in Task { await pane.navigate(path) } }.environmentObject(store) }
+        .sheet(item: $backupFile) { entry in FileBackupReviewSheet(backup: entry, backend: pane.backend) { await pane.navigate(pane.path, record: false) }.environmentObject(store) }
         .sheet(item: $editingFile, onDismiss: { pane.busy = false }) { entry in FileEditor(entry: entry, backend: pane.backend, refresh: { await pane.navigate(pane.path, record: false) }).environmentObject(store) }
     }
     var filterField: some View {
@@ -223,6 +228,7 @@ struct FilePaneView: View {
         if !entry.directory && !entry.symlink {
             actions.append(FileTableAction(title: store.text("Follow log", "跟踪日志"), enabled: selected.count == 1,
                 action: { store.openLogViewer(pane: pane, entry: entry, host: endpointIsRemote ? model.rightHost : nil) }))
+            if (try? FileBackupReview.originalPath(entry)) != nil { actions.append(FileTableAction(title: store.text("Restore backup…", "恢复备份…"), enabled: selected.count == 1, action: { backupFile = entry })) }
             actions.append(FileTableAction(title: store.text("Edit externally…", "使用外部编辑器…"), enabled: selected.count == 1, action: {
                 Task { do { try await store.externalEdits.open(entry: entry, pane: pane, host: pane === model.remote && !model.rightIsLocal ? model.rightHost : nil, username: pane === model.remote ? model.rightAuthenticatedUsername : nil); model.showExternalEdits = true } catch { store.error = error.localizedDescription; model.showExternalEdits = true } }
             }))

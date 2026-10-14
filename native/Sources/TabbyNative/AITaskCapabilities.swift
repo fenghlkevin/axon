@@ -14,8 +14,13 @@ struct AIExecutionPolicy: Codable, Equatable {
     var maximumSteps = 60
     var commandSeconds = 120
     var taskMinutes = 30
+    var tokenBudget: Int?
+    var costBudgetUSD: Double?
     var rules = ""
     var exactAllows: [AIExactPermission]?
+    var toolPermissions: [String: AIToolPermission]?
+    func toolPermission(_ category: AIToolCategory) -> AIToolPermission { toolPermissions?[category.rawValue] ?? .inherit }
+    func toolPermission(for tool: String) -> AIToolPermission { AIToolCategory.category(for: tool).map(toolPermission) ?? .inherit }
     enum Mode: String, Codable, CaseIterable { case everyTime, assisted, fullAccess }
     var approvalMode: Mode?
     var commandWhitelist: String?
@@ -53,6 +58,8 @@ struct AIExecutionPolicy: Codable, Equatable {
     }
     func validate() throws {
         guard (12...200).contains(maximumSteps), (10...1800).contains(commandSeconds), (1...240).contains(taskMinutes) else { throw AppFailure.message("Invalid task limits / 任务限额无效") }
+        guard tokenBudget == nil || (100...100_000_000).contains(tokenBudget!), costBudgetUSD == nil || (costBudgetUSD!.isFinite && (0.001...10000).contains(costBudgetUSD!)) else { throw AppFailure.message("Invalid token or cost budget / Token 或费用限额无效") }
+        guard (toolPermissions ?? [:]).keys.allSatisfy({ AIToolCategory(rawValue: $0) != nil }) else { throw AppFailure.message("Unknown tool permission / 未知工具权限") }
         for pattern in patterns(commandWhitelist) + patterns(commandBlacklist) {
             guard (try? NSRegularExpression(pattern: "^(?:" + pattern + ")$")) != nil else { throw AppFailure.message("Invalid command list regex / 命令列表正则无效：" + pattern) }
         }
@@ -78,12 +85,13 @@ struct AIExecutionPolicy: Codable, Equatable {
             if fields[0] == "deny" { return .deny }
             if fields[0] == "ask" { matched = .ask } else if fields[0] == "allow", matched == nil { matched = .allow }
         }
-        // Explicit deny/ask cannot be bypassed by a mode or remembered permission.
-        if matched == .ask { return .ask }
-        if matched == .allow { return .allow }
-        if mode == .everyTime { return .ask }
+        // Tool prohibitions and explicit asks outrank all remembered grants.
+        let permission = toolPermission(for: tool)
+        if permission == .deny { return .deny }
+        if matched == .ask || permission == .ask || mode == .everyTime { return .ask }
+        if matched == .allow || permission == .allow { return .allow }
         if mode == .fullAccess { return .allow }
-        if tool == "replace_file" { return .ask }
+        if tool == "replace_file" || tool == "replace_files" { return .ask }
         if matched == .allow || patterns(commandWhitelist).contains(where: { pattern in values.contains { listMatches(pattern, $0, denying: false) } }) { return .allow }
         return automatic ? .allow : .ask
     }
@@ -102,29 +110,59 @@ struct AITaskRecord: Codable, Identifiable {
     var messageCount: Int? = nil
     var turns: [AIAssistant.ConversationTurn]? = nil
     var executed: Bool? = nil
+    var workingMemory: AITaskMemory? = nil
+    var verification: AIVerificationState? = nil
+    var recovery: AITaskRecovery? = nil
+    var plans: [AIAgentPlan]? = nil
+    var planExecution: AIPlanExecution? = nil
+    var todos: [AITodoItem]? = nil
+    var parentConversationID: UUID? = nil
+    var forkTurnCount: Int? = nil
+    var usage: AIUsageLedger? = nil
 }
 
 @MainActor final class AIFileProposal {
     let edit: ExternalEdit
     let root: URL
-    let preview: String
+    private(set) var preview: String
     let path: String
-    init(backend: any FileEndpoint, path: String, find: String, replacement: String) async throws {
-        guard path.hasPrefix("/"), path.utf8.count <= 4096, !path.unicodeScalars.contains(where: { $0.value < 32 || (127...159).contains($0.value) }), !find.isEmpty, find != replacement, !find.contains("[REDACTED]"), !replacement.contains("[REDACTED]"), !replacement.contains("\0"), find.utf8.count <= 16000, replacement.utf8.count <= 16000 else { throw AppFailure.message("Use an absolute path and an exact nonempty replacement; redacted values cannot be written. / 请使用绝对路径和明确替换内容，不能写入脱敏占位符。") }
+    let originalEntry: FileEntry
+    private(set) var checkpoint: AIFileCheckpoint
+    private(set) var originalText = ""
+    init(backend: any FileEndpoint, path: String, find: String, replacement: String, wholeFile: Bool = false) async throws {
+        guard path.hasPrefix("/"), path.utf8.count <= 4096, !path.unicodeScalars.contains(where: { $0.value < 32 || (127...159).contains($0.value) }), (wholeFile || !find.isEmpty), find != replacement, !find.contains("[REDACTED]"), !replacement.contains("[REDACTED]"), !replacement.contains("\0"), find.utf8.count <= (wholeFile ? 65536 : 16000), replacement.utf8.count <= (wholeFile ? 65536 : 16000) else { throw AppFailure.message("Use an absolute path and an exact nonempty replacement; redacted values cannot be written. / 请使用绝对路径和明确替换内容，不能写入脱敏占位符。") }
         let entry = try await backend.stat(path)
+        originalEntry = entry
         guard entry.size <= 64 * 1024 else { throw AppFailure.message("Configuration edit limit is 64 KB / 配置修改限额为 64 KB") }
         root = FileManager.default.temporaryDirectory.appendingPathComponent("axon-ai-edit-" + UUID().uuidString)
         edit = try await ExternalEdit.prepare(entry: entry, backend: backend, directory: root)
         self.path = path
         do {
             let data = try Data(contentsOf: edit.localURL)
-            guard let old = String(data: data, encoding: .utf8), old.components(separatedBy: find).count == 2 else { throw AppFailure.message("The exact text must occur once; read the configuration again. / 待替换内容必须精确匹配一次，请重新读取配置。") }
-            let new = old.replacingOccurrences(of: find, with: replacement)
+            guard let old = String(data: data, encoding: .utf8), (wholeFile ? old == find : old.components(separatedBy: find).count == 2) else { throw AppFailure.message("The exact text must occur once; read the configuration again. / 待替换内容必须精确匹配一次，请重新读取配置。") }
+            originalText = old
+            let new = wholeFile ? replacement : old.replacingOccurrences(of: find, with: replacement)
             guard new.utf8.count <= 64 * 1024 else { throw AppFailure.message("Configuration exceeds 64 KB / 配置超过 64 KB") }
+            checkpoint = AIFileCheckpoint(path: path, before: AIFileCheckpoint.digest(data), after: AIFileCheckpoint.digest(Data(new.utf8)))
             preview = "− Exact original text / 原文：\n" + AIContext.sanitize(find) + "\n\n+ Replacement / 替换为：\n" + AIContext.sanitize(replacement)
             try Data(new.utf8).write(to: edit.localURL, options: .atomic)
             edit.checkChanges()
         } catch { try? FileManager.default.removeItem(at: root); throw error }
+    }
+    func reviewedText() throws -> String { try String(contentsOf: edit.localURL, encoding: .utf8) }
+    func updateReviewedContent(_ text: String) throws {
+        guard text.utf8.count <= 65536, !text.contains("\0"), !text.contains("[REDACTED]") else { throw AIModelError.invalidReply }
+        try Data(text.utf8).write(to: edit.localURL, options: .atomic)
+        checkpoint = AIFileCheckpoint(path: path, before: checkpoint.before, after: AIFileCheckpoint.digest(Data(text.utf8)))
+        preview = AIContext.sanitize(EditDifferencePreview.make(old: originalText, new: text))
+        edit.checkChanges()
+    }
+    func checkOriginal() async throws {
+        let entry = try await edit.backend.stat(path)
+        guard !entry.symlink, !entry.directory, entry.size <= 65536, FileContentDigest.sameMetadata(originalEntry, entry), originalEntry.permissions == entry.permissions,
+              AIFileCheckpoint.digest(try await ExternalEdit.read(entry, from: edit.backend)) == checkpoint.before else {
+            throw AppFailure.message("File changed after review / 审阅后文件已改变：" + path)
+        }
     }
     func apply() async throws -> AICommandResult {
         try Task.checkCancellation()
@@ -147,12 +185,14 @@ struct AITaskPolicyFields: View {
             AxonChoiceField(selection: Binding(get: { policy.mode }, set: { policy.approvalMode = $0 }), choices: AIExecutionPolicy.Mode.allCases.map { ($0, modeTitle($0)) }, placeholder: store.text("Approval mode", "批准模式"), symbol: "hand.raised", identifier: "axon-ai-approval-mode").frame(maxWidth: 360)
             Text(modeDescription).font(.system(size: 11)).foregroundStyle(Palette.muted)
             Text(store.text("System command rules · all targets", "系统级命令规则 · 适用于所有目标")).font(.system(size: 12, weight: .semibold))
-            Label(store.text("Built-in prohibitions: deletion, data destruction, disk formatting, partition changes and raw block-device writes, shutdown, package changes and destructive SQL. Scripts must be inspected before execution. Settings and approval cannot override these rules. Ordinary file creation, editing and saving follow permission rules.", "内置禁止：删除、销毁数据、磁盘格式化、分区变更及块设备写入、关机重启、软件包变更及破坏性 SQL。脚本执行前检查内容；配置与批准均不能覆盖。普通文件创建、编辑与保存遵循权限规则。"), systemImage: "lock.fill").font(.system(size: 11)).foregroundStyle(Palette.muted)
+            Label(store.text("Critical operations remain prohibited: physical deletion, data destruction, disk formatting/partition changes, raw block-device writes, shutdown/reboot and AI use of interactive editors (Vim/Nano/Emacs). Other commands follow the selected permission mode and system/server rules. Blacklists and deny rules take priority. Scripts are inspected before execution.", "关键操作禁止执行：物理删除、销毁数据、磁盘格式化／分区变更、块设备写入、关机重启及 AI 操作交互式编辑器（Vim/Nano/Emacs）。其他命令遵循所选权限模式及系统／服务器规则，黑名单与 deny 规则优先。脚本执行前检查内容。"), systemImage: "lock.fill").font(.system(size: 11)).foregroundStyle(Palette.muted)
             AICommandListFields(whitelist: Binding(get: { policy.commandWhitelist ?? "" }, set: { policy.commandWhitelist = $0 }), blacklist: Binding(get: { policy.commandBlacklist ?? "" }, set: { policy.commandBlacklist = $0 }), identifier: "axon-ai-command")
             Text(store.text("One command name per line, e.g. rm or printf. Names cover command arguments, sudo and absolute paths. Existing regex entries remain supported. System rules apply to every target; server rules are in host details. Both blacklists win over allow rules. Every-time approval ignores allow rules. Explicit advanced ask rules still require approval in full access.", "每行一个命令名，例如 rm 或 printf，覆盖不同参数、sudo 和绝对路径。兼容已有正则规则。系统级规则作用于全部目标；服务器级规则在主机详情中配置。两级黑名单均优先于白名单。每次批准不自动放行允许规则；完整权限仍遵守高级 ask 规则。" )).font(.system(size: 11)).foregroundStyle(Palette.muted)
+            AIToolPermissionFields(policy: $policy)
             Stepper(store.text("Maximum steps: ", "最多步骤：") + String(policy.maximumSteps), value: $policy.maximumSteps, in: 12...200)
             Stepper(store.text("Command timeout: ", "命令超时：") + String(policy.commandSeconds) + "s", value: $policy.commandSeconds, in: 10...1800, step: 10)
             Stepper(store.text("Task budget: ", "任务时长：") + String(policy.taskMinutes) + store.text(" min", " 分钟"), value: $policy.taskMinutes, in: 1...240)
+            AIUsageBudgetFields(policy: $policy)
             if let exact = policy.exactAllows, !exact.isEmpty {
                 Text(store.text("Remembered exact permissions: ", "已记住的精确权限规则：") + String(exact.count)).foregroundStyle(Palette.muted)
                 ForEach(Array(exact.enumerated()), id: \.offset) { index, rule in

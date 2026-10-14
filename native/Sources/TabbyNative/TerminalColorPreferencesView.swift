@@ -58,7 +58,7 @@ struct TerminalColorPreferencesView: View {
                     Text("\(filtered.count)").font(.system(size: 11)).foregroundStyle(Palette.muted)
                 }
                 schemeGrid
-                Text(commit == nil ? text("Select a card to preview. Save settings below to apply the selection and persist your scheme library.", "点击卡片预览。方案选择与方案库更改，点击设置底部「保存」后持久生效。") : text("Select a card to preview, then Save settings below to apply it. Saving in the color editor keeps and applies your custom scheme immediately.", "点击卡片预览，点击设置底部「保存」应用所选方案。编辑窗口中保存方案后，立即保留并应用自定义配色。"))
+                Text(commit == nil ? text("Select a card to preview. Save settings below to apply the selection and persist your scheme library.", "点击卡片预览。方案选择与方案库更改，点击设置底部「保存」后持久生效。") : text("Select a card to apply its colors automatically. Saving in the color editor keeps and applies your custom scheme immediately.", "点击卡片后自动应用所选方案。编辑窗口中保存方案后，立即保留并应用自定义配色。"))
                     .font(.system(size: 11)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
             }
             if !message.isEmpty {

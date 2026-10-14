@@ -2,16 +2,23 @@ import Foundation
 
 /// Immutable product restrictions. These are deliberately not user settings.
 enum AIBuiltInDeny {
-    static let commands = ["rm", "unlink", "shred", "truncate", "mkfs", "wipefs", "blkdiscard", "dd", "lvremove", "vgremove", "pvremove", "reboot", "shutdown", "poweroff", "halt"]
+    static let editors = ["vi", "vim", "nvim", "vimdiff", "view", "gvim", "nano", "pico", "emacs", "emacsclient", "joe", "micro", "ed", "ex"]
+    static func editorCommand(_ text: String) -> Bool {
+        let literal = text.filter { !["\"", "'", "\\"].contains(String($0)) }
+        let names = editors.joined(separator: "|")
+        return literal.range(of: "(?<![A-Za-z0-9_.-])(?:" + names + ")(?:\\.(?:tiny|basic))?(?![A-Za-z0-9_.-])", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    static let commands = ["rm", "rmdir", "unlink", "shred", "truncate", "mkfs", "wipefs", "blkdiscard", "dd", "lvremove", "vgremove", "pvremove", "reboot", "shutdown", "poweroff", "halt"]
     static func matches(_ text: String) -> Bool {
+        if editorCommand(text) { return true }
         let text = text.filter { !["\"", "'", "\\"].contains(String($0)) }
         func match(_ pattern: String) -> Bool { text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil }
         if commands.contains(where: { match("(?<![A-Za-z0-9_.-])" + $0 + "(?![A-Za-z0-9_.-])") }) { return true }
         if match("(?<![A-Za-z0-9_.-])mkfs\\.[A-Za-z0-9_-]+") { return true }
         if match("(?<![A-Za-z0-9_.-])find\\s[\\s\\S]*\\s-delete(?:\\s|$)") { return true }
-        if match("(?<![A-Za-z0-9_.-])(?:DROP|TRUNCATE|DELETE|UPDATE)(?![A-Za-z0-9_.-])") { return true }
+        if match("(?<![A-Za-z0-9_.-])(?:DROP|TRUNCATE|DELETE)(?![A-Za-z0-9_.-])") { return true }
         if match("(?<![A-Za-z0-9_.-])(?:systemctl|loginctl)\\s[\\s\\S]*\\b(?:reboot|poweroff|halt)(?![A-Za-z0-9_.-])") { return true }
-        if match("(?<![A-Za-z0-9_.-])(?:apt|apt-get|yum|dnf)\\s[\\s\\S]*\\b(?:install|reinstall|remove|erase|purge|autoremove|upgrade|dist-upgrade|full-upgrade|distro-sync|downgrade|swap|update)(?![A-Za-z0-9_.-])") { return true }
+        if match("(?<![A-Za-z0-9_.-])(?:apt|apt-get|yum|dnf)\\s[\\s\\S]*\\b(?:remove|erase|purge|autoremove|swap)(?![A-Za-z0-9_.-])") { return true }
         if match("(?<![A-Za-z0-9_.-])(?:docker|docker-compose)\\s[\\s\\S]*\\b(?:rm|rmi|prune)(?![A-Za-z0-9_.-])") { return true }
         if match("(?<![A-Za-z0-9_.-])(?:docker|docker-compose)\\s[\\s\\S]*\\bdown\\b[\\s\\S]*(?:\\s-v(?:\\s|$)|--volumes)") { return true }
         // Disk tools allow only explicit listing forms; interactive/default modes can write.

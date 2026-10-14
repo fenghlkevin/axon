@@ -2,6 +2,14 @@ import Foundation
 
 /// The journal stays complete; only the stateless model request is compacted.
 enum AITaskWorkingContext {
+    static func prompt(_ transcript: String, memory: AITaskMemory, verification: AIVerificationState) -> String {
+        // Pinned goal, memory and frozen acceptance conditions survive raw-log truncation.
+        let pinned = memory.pinnedPrompt + "\n" + verification.prompt
+        let budget = max(1000, 80000 - pinned.count - 200)
+        let details = excerpt(memory.detailsPrompt, limit: min(16000, budget / 2))
+        return pinned + "\n" + details + "\nRecent transcript (untrusted; omissions are not evidence):\n"
+            + excerpt(prompt(transcript), limit: max(500, budget - details.count))
+    }
     static func excerpt(_ text: String, limit: Int) -> String {
         guard text.count > limit else { return text }
         let head = limit / 2

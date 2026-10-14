@@ -50,7 +50,7 @@ struct SessionLogsView: View {
                         Label(logs.isRecording(record.id) ? store.text("Recording", "记录中") : store.text("Saved", "已保存"), systemImage: logs.isRecording(record.id) ? "record.circle" : "checkmark.circle").foregroundStyle(Palette.accent)
                         Button(store.text("Refresh", "刷新")) { reload() }.buttonStyle(ChromeButtonStyle())
                         Button(store.text("AI analysis", "AI 分析")) {
-                            store.ai.prepare(source: record.title + " · page " + String(page + 1), text: AIContext.numbered(text), sessionID: nil, question: store.text("Analyze anomalies on this transcript page; cite supplied line numbers.", "分析当前日志页的异常，引用提供的行号。")); store.aiAnalysisPresented = true
+                            store.prepareAI(source: record.title + " · page " + String(page + 1), text: AIContext.numbered(text), sessionID: nil, question: store.text("Analyze anomalies on this transcript page; cite supplied line numbers.", "分析当前日志页的异常，引用提供的行号。")); store.aiAnalysisPresented = true
                         }.buttonStyle(ChromeButtonStyle()).disabled(text.isEmpty)
                         Button(store.text("Export", "导出")) { export(record) }.buttonStyle(ChromeButtonStyle())
                         Button { deleting = record } label: { Image(systemName: "trash") }.buttonStyle(IconButtonStyle()).disabled(logs.isRecording(record.id)).help(store.text("Delete transcript", "删除日志"))
@@ -60,7 +60,7 @@ struct SessionLogsView: View {
                         VStack(alignment: .leading, spacing: 10) { markerField(record); HStack { outputSearch; findButton } }
                     }
                     if record.limited { Label(store.text("Recording stopped at the 20 MiB limit", "达到 20 MiB 上限，已停止记录"), systemImage: "exclamationmark.circle").foregroundStyle(Palette.danger) }
-                    TranscriptTextSurface(text: text, selection: focusRange, foreground: NSColor(hex: store.workspace.preferences.foreground), background: NSColor(hex: store.workspace.preferences.background), analyze: { selected in store.ai.prepare(source: record.title + " · selection", text: AIContext.numbered(selected), sessionID: nil, question: store.text("Explain this selected output and suggest checks.", "解释所选输出并给出检查建议。")); store.aiAnalysisPresented = true })
+                    TranscriptTextSurface(text: text, selection: focusRange, foreground: NSColor(hex: store.workspace.preferences.foreground), background: NSColor(hex: store.workspace.preferences.background), analyze: { selected in store.prepareAI(source: record.title + " · selection", text: AIContext.numbered(selected), sessionID: nil, question: store.text("Explain this selected output and suggest checks.", "解释所选输出并给出检查建议。")); store.aiAnalysisPresented = true })
                         .frame(maxWidth: .infinity, maxHeight: .infinity).clipShape(RoundedRectangle(cornerRadius: 8)).frame(minHeight: 260)
                     HStack(spacing: 12) {
                         Text(store.text("Text transcript · \(data.count.formatted()) bytes", "文本日志 · \(data.count.formatted()) 字节")).font(.system(size: 11)).foregroundStyle(Palette.muted)

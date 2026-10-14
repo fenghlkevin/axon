@@ -70,7 +70,7 @@ struct CloudBackupPreferencesPane: View {
                 Text(store.text("Applies to manual and automatic backups. New files include a timestamp and unique ID; older backups are retained.", "同时用于手动和自动备份；新文件名包含时间和唯一标识，保留历史备份。关闭时自动备份更新固定的最新文件。" )).font(.caption).foregroundStyle(Palette.muted)
                 Toggle(store.text("Include passwords and pasted private keys", "携带密码与粘贴的私钥"), isOn: $includeSecrets).toggleStyle(AxonCheckboxStyle())
                     .accessibilityIdentifier("axon-cloud-include-secrets")
-                Text(store.text("Manual and automatic backups share this password and credential option. Backups are encrypted locally; the password is never sent to storage. Enabling automatic backup and saving remembers it in this Mac's Keychain. Restore asks for the original backup password separately. Private-key files, logs and recent history are excluded.", "手动与自动备份共用这里的密码和携带凭据选项。备份先在本机加密，密码不发送给存储服务；启用自动备份并保存设置后，会记在本机钥匙串中。恢复时单独输入原备份密码。私钥文件不复制，日志和最近记录不备份。" )).foregroundStyle(Palette.muted)
+                Text(store.text("Manual and automatic backups share this password and credential option. Backups are encrypted locally; the password is never sent to storage. Enabling automatic backup remembers it in this Mac's Keychain. Restore asks for the original backup password separately. Private-key files, logs and recent history are excluded.", "手动与自动备份共用这里的密码和携带凭据选项。备份先在本机加密，密码不发送给存储服务；启用自动备份且配置有效后，会记在本机钥匙串中。恢复时单独输入原备份密码。私钥文件不复制，日志和最近记录不备份。" )).foregroundStyle(Palette.muted)
                 if busy { ProgressView().controlSize(.small) }
                 if !message.isEmpty { Text(message).foregroundStyle(failed ? .red : Palette.blue).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("axon-cloud-result") }
             }
@@ -98,7 +98,6 @@ struct CloudBackupPreferencesPane: View {
                 field("Access Key ID", $settings.s3.accessKeyID, "AK")
                 HStack(spacing: 12) { Text("Secret Access Key").foregroundStyle(Palette.muted).frame(width: 125, alignment: .leading); PreferencesSecureField(title: "SK", text: $secret, identifier: "axon-cloud-secret", chinese: store.chinese).appInput() }
                 HStack(spacing: 10) {
-                    action(store.text("Save connection", "保存连接配置"), "axon-cloud-save", enabled: !busy && settingsReadable, run: saveConnection)
                     action(store.text("Upload backup", "上传备份"), "axon-cloud-upload", prominent: true, enabled: !busy && credentialReadable && password.count >= 8 && !secret.isEmpty, run: upload)
                     action(store.text("List backups…", "查看备份列表…"), "axon-cloud-download", enabled: !busy && credentialReadable && !secret.isEmpty, run: download)
                 }

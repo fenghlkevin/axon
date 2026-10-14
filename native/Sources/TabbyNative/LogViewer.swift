@@ -229,7 +229,7 @@ struct LogViewerWorkspace: View {
                     Button(store.text("Latest", "最新")) { autoScroll = true; newLines = 0; latestRequest = UUID(); model.jumpToLatest() }.buttonStyle(ChromeButtonStyle())
                     Button(store.text("AI analysis", "AI 分析")) {
                         let lines = model.visibleLines.suffix(200).map { "L\($0.id + 1): \($0.text)" }.joined(separator: "\n")
-                        store.ai.prepare(source: model.title + " · " + model.path, text: lines, sessionID: nil, question: store.text("Analyze anomalies in these loaded log lines. Cite line numbers and suggest checks.", "分析这些已加载日志的异常，引用行号并给出检查建议。")); store.aiAnalysisPresented = true
+                        store.prepareAI(source: model.title + " · " + model.path, text: lines, sessionID: nil, question: store.text("Analyze anomalies in these loaded log lines. Cite line numbers and suggest checks.", "分析这些已加载日志的异常，引用行号并给出检查建议。")); store.aiAnalysisPresented = true
                     }.buttonStyle(ChromeButtonStyle()).disabled(model.visibleLines.isEmpty)
                     Button(store.text("Export loaded", "导出已加载内容")) { model.export(chinese: store.chinese) }.buttonStyle(ChromeButtonStyle())
                 }
@@ -261,7 +261,7 @@ struct LogViewerWorkspace: View {
                                 if !wrapLines { Spacer(minLength: 0) }
                             }.frame(width: wrapLines ? max(100, geometry.size.width - 28) : nil, alignment: .leading)
                                 .padding(.vertical, 2).id(line.id)
-                                .contextMenu { Button(store.text("Analyze this line with AI", "使用 AI 分析此行")) { store.ai.prepare(source: model.title + " · " + model.path, text: "L\(line.id + 1): \(line.text)", sessionID: nil, question: store.text("Explain this log line and suggest checks.", "解释此日志行并给出检查建议。")); store.aiAnalysisPresented = true } }
+                                .contextMenu { Button(store.text("Analyze this line with AI", "使用 AI 分析此行")) { store.prepareAI(source: model.title + " · " + model.path, text: "L\(line.id + 1): \(line.text)", sessionID: nil, question: store.text("Explain this log line and suggest checks.", "解释此日志行并给出检查建议。")); store.aiAnalysisPresented = true } }
 
                         }
                         if !model.pendingText.isEmpty && model.filter.isEmpty && !model.onlyErrors {

@@ -69,6 +69,8 @@ final class PasswordInputView: NSView {
     override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 28) }
     override init(frame: NSRect) {
         super.init(frame: frame)
+        appearance = NSAppearance(named: .aqua)
+        activeField.cell = PasswordSecureTextFieldCell(textCell: "")
         setAccessibilityElement(false)
         addSubview(activeField)
         addSubview(visibilityButton)
@@ -98,6 +100,10 @@ final class PasswordInputView: NSView {
         activeField.frame = NSRect(x: 0, y: (bounds.height - fieldHeight) / 2,
                                    width: max(0, bounds.width - buttonWidth - 8), height: fieldHeight)
         visibilityButton.frame = NSRect(x: max(0, bounds.width - buttonWidth), y: (bounds.height - 28) / 2, width: buttonWidth, height: 28)
+    }
+    override func mouseDown(with event: NSEvent) {
+        guard enabled, let window else { return }
+        window.makeFirstResponder(activeField)
     }
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -139,6 +145,7 @@ final class PasswordInputView: NSView {
         activeField.setContentHuggingPriority(.defaultLow, for: .horizontal)
         activeField.delegate = fieldDelegate
         activeField.isEnabled = enabled
+        activeField.isEditable = true; activeField.isSelectable = true
         activeField.placeholderString = title
         activeField.identifier = NSUserInterfaceItemIdentifier(fieldIdentifier)
         activeField.setAccessibilityLabel(title)
@@ -177,7 +184,10 @@ final class PasswordInputView: NSView {
             field.cell = RevealedPasswordTextFieldCell(textCell: "")
             field.isEditable = true; field.isSelectable = true
             activeField = field
-        } else { activeField = NSSecureTextField() }
+        } else {
+            activeField = NSSecureTextField()
+            activeField.cell = PasswordSecureTextFieldCell(textCell: "")
+        }
         isRevealed = revealed
         addSubview(activeField, positioned: .below, relativeTo: visibilityButton)
         configureField()
@@ -224,8 +234,19 @@ private final class RevealedPasswordTextFieldCell: NSTextFieldCell {
     }
 }
 
+private final class PasswordSecureTextFieldCell: NSSecureTextFieldCell {
+    override func setUpFieldEditorAttributes(_ textObj: NSText) -> NSText {
+        let editor = super.setUpFieldEditorAttributes(textObj)
+        configureLiteralPasswordEditor(editor as? NSTextView)
+        return editor
+    }
+}
+
 private func configureLiteralPasswordEditor(_ editor: NSTextView?) {
     guard let editor else { return }
+    // The shared AppKit editor can retain the terminal's dark appearance.
+    // Password inputs always use Axon's light surface and dark insertion point.
+    editor.insertionPointColor = NSColor(Palette.text)
     editor.isAutomaticQuoteSubstitutionEnabled = false; editor.isAutomaticDashSubstitutionEnabled = false
     editor.isAutomaticTextReplacementEnabled = false; editor.isAutomaticSpellingCorrectionEnabled = false
     editor.isContinuousSpellCheckingEnabled = false; editor.isAutomaticLinkDetectionEnabled = false

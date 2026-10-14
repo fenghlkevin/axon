@@ -21,6 +21,12 @@ struct AxonCommands: Commands {
     @ObservedObject var store: AppStore
     private var commandStore: AppStore { SceneWindowController.focusedStore ?? store }
     var body: some Commands {
+            CommandGroup(replacing: .appInfo) {
+                Button(commandStore.text("About Axon", "关于 Axon")) { AxonAboutPanel.show() }
+            }
+            CommandGroup(replacing: .help) {
+                Button(commandStore.text("AI assistant manual", "AI 助手使用手册")) { AIManualWindowController.shared.show(store: commandStore) }
+            }
             CommandGroup(replacing: .appSettings) {
                 Button(commandStore.text("Settings…", "设置…")) { commandStore.openPreferences() }.keyboardShortcut(store.workspace.preferences.shortcut(.settings).keyEquivalent, modifiers: store.workspace.preferences.shortcut(.settings).modifiers)
             }
@@ -68,7 +74,7 @@ struct AxonCommands: Commands {
         if window === self.mainWindowController.window { return self.store }
         return SceneWindowController.shortcutStore(for: window)
     }
-    func applicationWillTerminate(_ notification: Notification) { SceneWindowController.closeAll(); store?.automaticBackup.cancel(); store?.batchTasks.cancelAll(); store?.externalEdits.edits.forEach { $0.stop() }; store?.monitoring.stop(); store?.forwardTasks.values.forEach { $0.cancel() }; store?.forwardEngines.values.forEach { $0.stop() }; store?.sceneTasks.values.forEach { $0.cancel() }; store?.logViewers.forEach { $0.close() }; store?.sessions.forEach { $0.disconnect() } }
+    func applicationWillTerminate(_ notification: Notification) { SceneWindowController.closeAll(); store?.aiSessions.forEach { $0.cancel() }; store?.automaticBackup.cancel(); store?.batchTasks.cancelAll(); store?.externalEdits.edits.forEach { $0.stop() }; store?.monitoring.stop(); store?.forwardTasks.values.forEach { $0.cancel() }; store?.forwardEngines.values.forEach { $0.stop() }; store?.sceneTasks.values.forEach { $0.cancel() }; store?.logViewers.forEach { $0.close() }; store?.sessions.forEach { $0.disconnect() } }
     func applicationDidFinishLaunching(_ notification: Notification) {
         launched = true
         shortcutDispatcher.start()
@@ -233,7 +239,7 @@ struct MainView: View {
         .onChange(of: store.aiTerminalRequest) { _, _ in terminalTool = "ai"; terminalToolsVisible = true }
         .sheet(isPresented: $store.aiAnalysisPresented) { AIAnalysisSheet().environmentObject(store) }
         .onChange(of: store.currentScene?.mode) { _, _ in updateMonitoring() }
-        .onChange(of: store.activeSession) { _, id in if let scene = store.openScenes.first(where: { $0.sessionIDs.contains(id ?? UUID()) }) { scene.selectedSessionID = id }; updateMonitoring() }
+        .onChange(of: store.activeSession) { _, id in if terminalToolsVisible && terminalTool == "ai" { store.prepareTerminalAI() }; if let scene = store.openScenes.first(where: { $0.sessionIDs.contains(id ?? UUID()) }) { scene.selectedSessionID = id }; updateMonitoring() }
         .onChange(of: store.sessions.map(\.id)) { _, _ in returnToHostsIfNeeded() }
         .onChange(of: store.workspace.hosts) { _, _ in updateMonitoring() }
         .onChange(of: store.workspace.credentials) { _, _ in updateMonitoring() }
@@ -969,5 +975,26 @@ struct SessionTab: View {
         case .moveLast: store.moveSessionToEnd(session.id)
         case .closeOthers: let keep = store.paneIDs(containing: session.id); for id in store.standaloneSessions.map(\.id) where !keep.contains(id) { store.close(id) }
         }
+    }
+}
+
+@MainActor enum AxonAboutPanel {
+    static func centeredFrame(size: NSSize, parent: NSRect, visible: NSRect) -> NSRect {
+        NSRect(x: max(visible.minX, min(parent.midX - size.width / 2, visible.maxX - size.width)),
+               y: max(visible.minY, min(parent.midY - size.height / 2, visible.maxY - size.height)),
+               width: size.width, height: size.height)
+    }
+    private static weak var panel: NSWindow?
+    @discardableResult static func show(relativeTo parent: NSWindow? = nil) -> NSWindow? {
+        let parent = parent ?? NSApp.keyWindow ?? NSApp.mainWindow
+        let existing = Set(NSApp.windows.map(ObjectIdentifier.init))
+        NSApp.orderFrontStandardAboutPanel(nil)
+        let presented = panel ?? NSApp.windows.first { !existing.contains(ObjectIdentifier($0)) && $0 is NSPanel }
+        guard let presented else { return nil }
+        panel = presented
+        if let parent, parent !== presented, let screen = parent.screen {
+            presented.setFrame(centeredFrame(size: presented.frame.size, parent: parent.frame, visible: screen.visibleFrame), display: true)
+        } else if parent !== presented { presented.center() }
+        return presented
     }
 }

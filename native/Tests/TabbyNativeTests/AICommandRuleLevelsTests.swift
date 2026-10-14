@@ -35,7 +35,7 @@ import XCTest
         let ai = AIAssistant(fileURL: root.appendingPathComponent("ai.json"), modelResponder: { prompt, _, update in
             round += 1
             let value = round == 1 ? "```axon_action\n{\"tool\":\"command\",\"argument\":\"printf blocked\",\"reason\":\"fixture\"}\n```" : "Blocked by server policy."
-            if round == 2 { XCTAssertTrue(prompt.contains("denied")) }; update(value); return value
+            if round == 2 { XCTAssertTrue(prompt.contains("denied")) }; update(value); return round == 1 ? try p0FixtureReply(value, goal: String(prompt.components(separatedBy: "Goal: ").last?.components(separatedBy: "\n").first ?? "")) : value
         })
         let executor = AICommandExecutor(sessionID: UUID(), source: "fixture", directory: nil, valid: { true }, execute: { command, _ in commands.append(command); return AICommandResult(output: "Linux\n/tmp", exitCode: 0) })
         executor.serverRuleHost = { host }

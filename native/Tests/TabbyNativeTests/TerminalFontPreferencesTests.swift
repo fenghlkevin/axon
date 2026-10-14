@@ -102,7 +102,7 @@ final class TerminalFontPreferencesTests: XCTestCase {
         try capture(hosting, name: "terminal-font-settings")
     }
 
-    @MainActor func testInvalidTypedFontSizeDisablesSaveInActualSettingsPane() async throws {
+    @MainActor func testInvalidTypedFontSizePreservesAppliedValueUntilCorrected() async throws {
         _ = NSApplication.shared
         let restoreAccessibility = enableAccessibility(); defer { restoreAccessibility() }
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("axon-font-settings-invalid-" + UUID().uuidString)
@@ -114,27 +114,23 @@ final class TerminalFontPreferencesTests: XCTestCase {
         try await settle(hosting)
         let size = try XCTUnwrap(find(TerminalFontSizeNativeEditor.self, in: hosting).first)
         try activate(size.increase, point: NSPoint(x: 20, y: 20)); try await settle(hosting)
-        let save = try XCTUnwrap(accessibilityObjects(hosting).first { read($0, "accessibilityIdentifier") as? String == "axon-preferences-save" })
-        XCTAssertEqual(read(save, "accessibilityEnabled") as? Bool, true)
+        XCTAssertEqual(store.workspace.preferences.fontSize, 20)
         size.field.stringValue = "oops"
         size.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: size.field))
         try await settle(hosting)
-        let disabledSave = try XCTUnwrap(accessibilityObjects(hosting).first { read($0, "accessibilityIdentifier") as? String == "axon-preferences-save" })
-        XCTAssertEqual(read(disabledSave, "accessibilityEnabled") as? Bool, false)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
+        XCTAssertEqual(store.workspace.preferences.fontSize, 20)
+        XCTAssertEqual(try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: store.fileURL)).preferences.fontSize, 20)
         let colorPage = try XCTUnwrap(find(PreferencesNavigationNativeButton.self, in: hosting).first { $0.identifier?.rawValue == "axon-preferences-page-appearance" })
         colorPage.performClick(nil); try await settle(hosting)
         let terminalPage = try XCTUnwrap(find(PreferencesNavigationNativeButton.self, in: hosting).first { $0.identifier?.rawValue == "axon-preferences-page-terminal" })
         terminalPage.performClick(nil); try await settle(hosting)
         let restoredSize = try XCTUnwrap(find(TerminalFontSizeNativeEditor.self, in: hosting).first)
         XCTAssertEqual(restoredSize.field.stringValue, "oops", "Changing categories retains invalid input for correction")
-        let stillDisabled = try XCTUnwrap(accessibilityObjects(hosting).first { read($0, "accessibilityIdentifier") as? String == "axon-preferences-save" })
-        XCTAssertEqual(read(stillDisabled, "accessibilityEnabled") as? Bool, false)
         restoredSize.field.stringValue = "24"
         restoredSize.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: restoredSize.field))
         try await settle(hosting)
-        let enabledSave = try XCTUnwrap(accessibilityObjects(hosting).first { read($0, "accessibilityIdentifier") as? String == "axon-preferences-save" })
-        XCTAssertEqual(read(enabledSave, "accessibilityEnabled") as? Bool, true)
+        XCTAssertEqual(store.workspace.preferences.fontSize, 24)
+        XCTAssertEqual(try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: store.fileURL)).preferences.fontSize, 24)
         try capture(hosting, name: "preferences-terminal-900")
     }
 

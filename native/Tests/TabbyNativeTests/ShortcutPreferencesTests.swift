@@ -87,13 +87,7 @@ import XCTest
         if let delivered = NSApp.nextEvent(matching: .keyDown, until: Date(timeIntervalSinceNow: 0.2), inMode: .default, dequeue: true) { NSApp.sendEvent(delivered) }
         try await Task.sleep(for: .milliseconds(150)); hosting.layoutSubtreeIfNeeded()
         XCTAssertFalse(button.recording); XCTAssertEqual(button.title, "⌘ N")
-        XCTAssertEqual(store.workspace.preferences.shortcut(.newTab).key, "t", "Recording keeps a draft until Save")
-        window.makeFirstResponder(nil)
-        let saveEvent = try XCTUnwrap(CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: true)); saveEvent.flags = .maskCommand
-        NSApp.postEvent(try XCTUnwrap(NSEvent(cgEvent: saveEvent)), atStart: true)
-        if let next = NSApp.nextEvent(matching: .keyDown, until: Date(timeIntervalSinceNow: 0.2), inMode: .default, dequeue: true) { NSApp.sendEvent(next) }
-        try await Task.sleep(for: .milliseconds(150))
-        XCTAssertEqual(store.workspace.preferences.shortcut(.newTab).key, "n")
+        XCTAssertEqual(store.workspace.preferences.shortcut(.newTab).key, "n", "Recording a valid shortcut applies it without saving")
         let persisted = try JSONDecoder().decode(Workspace.self, from: Data(contentsOf: store.fileURL))
         XCTAssertEqual(persisted.preferences.shortcut(.newTab).key, "n")
         if let path = ProcessInfo.processInfo.environment["AXON_UI_CAPTURE_DIR"] {
