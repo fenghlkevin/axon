@@ -1,396 +1,197 @@
-[![](docs/readme.png)](https://tabby.sh)
-
-
 <p align="center">
-  <a href="https://github.com/Eugeny/tabby/releases/latest"><img alt="GitHub All Releases" src="https://img.shields.io/github/downloads/eugeny/tabby/total.svg?label=DOWNLOADS&logo=github&style=for-the-badge"></a> &nbsp; <a href="https://nightly.link/Eugeny/tabby/workflows/build/master"><img src="https://shields.io/badge/-Nightly%20Builds-orange?logo=hackthebox&logoColor=fff&style=for-the-badge"/></a> &nbsp; <a href="https://discord.gg/Vn7BjmzhtF"><img alt="Discord" src="https://img.shields.io/discord/1280890060195233934?style=for-the-badge&color=blue&logo=discord&logoColor=white&label=Discord"></a> &nbsp <a href="https://translate.tabby.sh/"><img alt="Translate" src="https://shields.io/badge/Translate-UI-white?logo=googletranslate&style=for-the-badge&color=white&logoColor=fff"></a>
+  <img src="native/Branding/axon-icon.png" width="112" alt="Axon 图标">
 </p>
 
-<p align="center">
-  <a href="https://ko-fi.com/J3J8KWTF">
-    <img src="https://cdn.ko-fi.com/cdn/kofi3.png?v=2" width="150">
-  </a>
-</p>
+# Axon
 
----
+**将 SSH、终端、文件管理、主机监控与 AI 编程运维助手放进同一个 macOS 原生工作台。**
 
+Axon 使用 SwiftUI / AppKit 构建，终端基于 SwiftTerm，SSH / SFTP 基于 Citadel。你可以管理服务器、维护文件、查看日志，让 AI 结合当前终端和项目证据持续排查，并在权限控制下完成操作、差异审查和结果验证。
 
-> 👋 Managing remote environments? Check out [Warpgate, my smart SSH/HTTP/MySQL bastion server](https://github.com/warp-tech/warpgate), it works great with Tabby, you'll love it.
+当前源码打包版本：**0.19.29（194）**。运行环境：**Apple Silicon · macOS 15+**。版本以 [打包脚本](native/scripts/package.sh) 为准。
 
-----
+[快速开始](#快速开始) · [全部功能](#全部功能) · [特色功能与截图](#特色功能与截图) · [源码构建](#源码构建) · [使用手册](native/AI-ASSISTANT-MANUAL.md)
 
-### Downloads:
+## 快速开始
 
-* [Latest release](https://github.com/Eugeny/tabby/releases/latest)
-* [Repositories](https://packagecloud.io/eugeny/tabby): [Debian/Ubuntu-based](https://packagecloud.io/eugeny/tabby/install#bash-deb), [RPM-based](https://packagecloud.io/eugeny/tabby/install#bash-rpm)
-* [Latest nightly build](https://nightly.link/Eugeny/tabby/workflows/build/master)
+1. 从源码构建 `native/dist/Axon.app`，或使用维护者提供的发行包。构建步骤见下文。
+2. 打开应用，在主机库新建 SSH 主机，配置地址、账号和密码、私钥或 SSH Agent；也可以先打开本地终端。
+3. 首次连接核对服务器 SHA256 指纹。使用顶部标签切换终端、SFTP 和工作场景。
+4. 需要 AI 时，在设置 → AI 助手配置本机 Codex CLI、ChatGPT 兼容 API 或 Claude / CC。先选择「对话助手」熟悉操作，再选择需要执行的本机或 SSH 目标。
+5. 帮助 → AI 助手使用手册提供 24 章离线图文指引，包含上下文、权限、项目、文件审查、MCP 和故障恢复。
 
-<br/>
-<p align="center">
-This README is also available in: <a  href="./README.es-ES.md">:es: Spanish</a> · <a  href="./README.ru-RU.md">:ru: Русский</a> · <a  href="./README.ko-KR.md">:kr: 한국어</a> · <a  href="./README.zh-CN.md">:cn: 简体中文</a> · <a  href="./README.it-IT.md">:it: Italiano</a> · <a href="./README.de-DE.md">:de: Deutsch</a> · <a href="./README.ja-JP.md">:jp: 日本語</a> · <a href="./README.id-ID.md">:id: Bahasa Indonesia</a> · <a href="./README.pt-BR.md">:brazil: Português</a> · <a href="./README.pl-PL.md">:poland: Polski</a>
-</p>
+## 全部功能
 
-----
+### 主机、认证与连接
 
-[**Tabby**](https://tabby.sh) (formerly **Terminus**) is a highly configurable terminal emulator, SSH and serial client for Windows, macOS and Linux
+- 主机网格 / 列表、跨分组搜索、分组、标签、收藏、排序、复制及移动；快速连接支持 `ssh user@hostname -p 2222`。
+- 本地共享凭据库：密码、私钥文件或私钥文本；主机引用共享身份，敏感凭据使用 macOS 钥匙串。
+- 密码、OpenSSH Ed25519 / RSA 私钥、RSA-SHA2、本机 SSH Agent、跳板机链、断线重连与连接诊断。
+- OpenSSH 用户证书、服务器证书与显式信任 CA；首次主机指纹确认、密钥变化拒绝连接及已知主机管理。
+- 按主机开启、限定单个身份的 Agent 转发；本地 / 远程 TCP 转发和动态 SOCKS5 TCP 代理（支持远端 DNS）。
+- 可配置 tmux 持久会话，断线后重新连接恢复远端屏幕与进程；服务器需具备对应环境。
 
-* Integrated SSH and Telnet client and connection manager
-* Integrated serial terminal
-* Theming and color schemes
-* Fully configurable shortcuts and multi-chord shortcuts
-* Split panes
-* Remembers your tabs
-* PowerShell (and PS Core), WSL, Git-Bash, Cygwin, MSYS2, Cmder and CMD support
-* Direct file transfer from/to SSH sessions via Zmodem
-* Full Unicode support including double-width characters
-* Doesn't choke on fast-flowing outputs
-* Proper shell experience on Windows including tab completion (via Clink)
-* Integrated encrypted container for SSH secrets and configuration
-* SSH, SFTP and Telnet client available as a [web app](https://tabby.sh/app) (also [self-hosted](https://github.com/Eugeny/tabby-web)).
+### 终端与工作场景
 
-# Contents <!-- omit in toc -->
+- 本地登录 Shell、多个 SSH 标签、最多四终端分屏、拖动合并、独立字号与终端搜索。
+- 中文输入、Unicode、复制粘贴、Bracketed Paste、多终端选择性同步键盘与粘贴；同步命令可先填入或确认执行。
+- 终端主题、字体、光标、回滚、关键词普通文本 / 正则高亮；高亮按全局、分组或主机设置，不改变原文。
+- Bash / Zsh Shell 集成记录目录、命令、耗时和退出状态，支持失败命令筛选、排除规则与长命令完成通知。
+- 工作场景保存终端顺序、分屏、初始目录、文件 / 日志路径及转发规则；场景打开为独立工作区。
+- 代码片段分组、搜索、排序、参数默认值、类型校验和展开预览；可对多个连接插入或执行。
+- 最近打开记录、可调整终端工具侧栏、中英文界面、可配置快捷键与黑 / 白图标。
 
-- [What Tabby is and isn't](#what-tabby-is-and-isnt)
-- [Terminal features](#terminal-features)
-- [SSH Client](#ssh-client)
-- [Serial Terminal](#serial-terminal)
-- [Portable](#portable)
-- [Plugins](#plugins)
-- [Themes](#themes)
-- [Contributing](#contributing)
+### SFTP、编辑与传输
 
-<a name="about"></a>
+- 本地 / 远程、本地 / 本地双栏；路径历史、目录收藏、排序、筛选、隐藏文件、中文名称与多选。
+- 上传、下载、本地复制、拖放、递归目录、空文件、进度 / 速度、取消和重试。
+- 失败传输重试前校验已传前缀；使用暂存文件提交，覆盖确认，源 / 目标变化检查及失败恢复。
+- 创建文件 / 目录、重命名、八进制权限、删除和复制路径；本地删除进废纸篓，远程删除需确认。
+- 内置 UTF-8 文本编辑与备份；外部编辑器工作副本、差异审查、冲突检测及确认回传。
+- 终端与 SFTP 目录联动、目录精确比较与按固定差异上传；不跟随符号链接传输。
 
-# What Tabby is and isn't
+### 监控、日志与批量运维
 
-* **Tabby is** an alternative to Windows' standard terminal (conhost), PowerShell ISE, PuTTY, macOS Terminal.app and iTerm
+- Linux CPU、内存、负载、存储、进程、网络 / IP、NVIDIA GPU 及 Docker 只读详情；能力取决于远端环境。
+- 主机库监控概览与终端侧栏状态，支持监控分组和分类显示。
+- UTF-8 日志跟随、搜索、过滤和导出；终端会话日志手动启停、分页查看、命令定位及导出。
+- 命令及日志来源区分 AI、人工、混合和未知，帮助复核实际操作。
+- 批量任务按主机 / 分组 / 标签选目标，支持参数模板、并发、超时、实时输出、退出码、取消、失败重试及 JSON 导出。
+- 批量任务历史和模板持久化；重试前核对目标身份与路线，异常退出记录明确标为中断。
 
-* **Tabby is not** a new shell or a MinGW or Cygwin replacement. Neither is it lightweight - if RAM usage is of importance, consider [Conemu](https://conemu.github.io) or [Alacritty](https://github.com/jwilm/alacritty)
+### 导入、导出与备份
 
-<a name="terminal"></a>
+- Tabby YAML、OpenSSH config、Termius 兼容 CSV、PuTTY `.reg` 导入预览、主机去重、分组与跳板关系导入；支持 YAML / CSV / OpenSSH config 导出，具体可迁移字段见 [原生工程说明](native/README.md)。
+- 工作区本地保存及备份；加密备份可保存到本地 / iCloud 同步目录及 S3 兼容存储。
+- 启动后自动备份、手动立即备份、历史列表与恢复；可保留每次备份或更新固定文件。
+- AI 服务配置独立存储，API 密钥放入钥匙串，不随普通工作区导出。
 
-# Terminal features
+### AI 助手与项目开发
 
-![](docs/readme-terminal.png)
+- 本机 Codex CLI、ChatGPT 兼容 Chat Completions API、Claude / CC Messages API；模型、推理强度和速度按后端能力选择。
+- 流式回答、停止、追问、失败重试、语音转文字草稿、上下文预览及常见敏感信息脱敏。
+- 三种方式：对话助手、当前终端操作、独立执行命令；执行目标绑定到对应会话。
+- 读取终端、输入文字、发送按键、等待输出，处理交互程序；后台通道执行诊断并返回真实输出与状态。
+- 文件 / 行 / 图片 / 网页引用、项目索引与搜索、多仓库、公开网页检索及来源核对。
+- 多会话、持久历史、对话分叉、消息排队、运行中纠正方向、澄清问题和收件箱通知。
+- 计划创建、阶段选择、版本比较、提示模板、工作流、知识库、记忆、Skills 与项目指引。
+- 多文件修改审查、逐项应用、备份与冲突检查、文件时间线、撤销 / 重做、Git 差异与行评论、worktree。
+- 编辑器与语言服务 LSP；Agent 预设、工具权限、运行步数 / 时长限制、Token 用量、费用估算及预算。
+- MCP 服务连接、工具选择与调用审批；任务停止、历史恢复、恢复证据及完成验收。
+- 每次批准、帮我批准、完整权限三种审批模式；系统 / 主机命令黑白名单及精确操作规则。
 
-* A VT220 terminal + various extensions
-* Multiple nested split panes
-* Tabs on any side of the window
-* Optional dockable window with a global spawn hotkey ("Quake console")
-* Progress detection
-* Notification on process completion
-* Bracketed paste, multiline paste warnings
-* Font ligatures
-* Custom shell profiles
-* Optional RMB paste and copy-on select (PuTTY style)
+## 特色功能与截图
 
-<a name="ssh"></a>
+以下为仓库保留的原生 AppKit / SwiftUI 实际界面截图及其操作标注图，使用测试示例数据。截图主要来自 0.19.14–0.19.23，当前版本细节可能略有变化；并非所有功能都有单独截图。[截图来源与生成方式](native/Documentation/ManualScreenshots/README.md)。
 
-# SSH Client
+### 1. 与终端、项目相连的 AI 对话
 
-![](docs/readme-ssh.png)
+结合所选终端、命令和引用材料持续追问，发送前检查上下文；当前终端和独立执行通道按目标隔离。
 
-* SSH2 client with a connection manager
-* X11 and port forwarding
-* Automatic jump host management
-* Agent forwarding (incl. Pageant and Windows native OpenSSH Agent)
-* Login scripts
+![AI 对话与上下文](native/Sources/TabbyNative/Resources/AIManual/guide-chat.png)
 
-<a name="serial"></a>
+### 2. 项目索引、文件引用与多仓库
 
-# Serial Terminal
+让问题指向具体文件和代码行，在项目范围内搜索并核对依据。
 
-* Saved connections
-* Readline input support
-* Optional hex byte-by-byte input and hexdump output
-* Newline conversion
-* Automatic reconnection
+![项目索引与多仓库](native/Sources/TabbyNative/Resources/AIManual/guide-projects.png)
 
-<a name="portable"></a>
+### 3. 计划、阶段与版本比较
 
-# Portable
+将目标拆成计划，在执行前选择阶段，对比计划变化并保留人工控制。
 
-Tabby will run as a portable app on Windows, if you create a `data` folder in the same location where `Tabby.exe` lives.
+![计划与阶段](native/Sources/TabbyNative/Resources/AIManual/guide-plan.png)
 
-<a name="plugins"></a>
+![计划版本比较](native/Sources/TabbyNative/Resources/AIManual/guide-plan-compare.png)
 
-# Plugins
+### 4. 文件差异审查与时间线
 
-Plugins and themes can be installed directly from the Settings view inside Tabby.
+查看 AI 提议的文件改动，再选择应用；冲突与历史变更有独立入口。
 
-* [docker](https://github.com/Eugeny/tabby-docker) - connect to Docker containers
-* [title-control](https://github.com/kbjr/terminus-title-control) - allows modifying the title of the terminal tabs by providing a prefix, suffix, and/or strings to be removed
-* [quick-cmds](https://github.com/minyoad/tabby-quick-cmds) - quickly send commands to one or all terminal tabs
-* [save-output](https://github.com/Eugeny/tabby-save-output) - record terminal output into a file
-* [sync-config](https://github.com/starxg/terminus-sync-config) - sync the config to Gist or Gitee
-* [clippy](https://github.com/Eugeny/tabby-clippy) - an example plugin which annoys you all the time
-* [workspace-manager](https://github.com/composer404/tabby-workspace-manager) - allows creating custom workspace profiles based on the given config
-* [search-in-browser](https://github.com/composer404/tabby-search-in-browser) - opens default system browser with a text selected from the Tabby's tab
-* [sftp-tab](https://github.com/wljince007/tabby-sftp-tab) - open sftp tab for ssh connection like SecureCRT
-* [background](https://github.com/moemoechu/tabby-background) - change Tabby background image and more...
-* [highlight](https://github.com/moemoechu/tabby-highlight) - Tabby terminal keyword highlight plugin
-* [web-auth-handler](https://github.com/Jazzmoon/tabby-web-auth-handler) - In-app web authentication popups (Built primarily for warpgate in-browser auth)
-* [mcp-server](https://github.com/thuanpham582002/tabby-mcp-server) - Powerful Model Context Protocol server integration for Tabby that seamlessly connects with AI assistants through MCP clients like Cursor and Windsurf, enhancing your terminal workflow with intelligent AI capabilities.
-* [ssh-keymap](https://github.com/mathys-lopinto/tabby-ssh-keymap) - lets your synced Tabby SSH profiles reference private keys by name instead of by absolute file path. A local mapping file (never synced) translates each name to the real path on that machine * [serial-timestamp](https://github.com/WoodenNautilus/tabby-serial-timestamp) - adds timestamps to serial terminal sessions
+![文件差异审查](native/Sources/TabbyNative/Resources/AIManual/guide-edits.png)
 
-<a name="themes"></a>
+![文件时间线](native/Sources/TabbyNative/Resources/AIManual/guide-timeline.png)
 
-# Themes
+### 5. Git 审查、行评论与 worktree
 
-* [hype](https://github.com/Eugeny/tabby-theme-hype) - a Hyper inspired theme
-* [relaxed](https://github.com/Relaxed-Theme/relaxed-terminal-themes#terminus) - the Relaxed theme for Tabby
-* [gruvbox](https://github.com/porkloin/terminus-theme-gruvbox)
-* [windows10](https://www.npmjs.com/package/terminus-theme-windows10)
-* [altair](https://github.com/yxuko/terminus-altair)
-* [catppuccin](https://github.com/catppuccin/tabby) - Soothing pastel theme for Tabby
-* [noctis](https://github.com/aaronhuggins/tabby-colors-noctis) - color themes inspired by Noctis VS Code theme
+将开发任务与仓库差异联系起来，在行级讨论修改，并使用独立工作目录。
 
-# Sponsors <!-- omit in toc -->
+![Git 行评论](native/Sources/TabbyNative/Resources/AIManual/guide-git-comment.png)
 
-<a href="https://packagecloud.io"><img src="https://assets-production.packagecloud.io/assets/logo_v1-d5895e7b89b2dee19030e85515fd0f91d8f3b37c82d218a6531fc89c2b1b613c.png" width="200"></a>
+![Worktree](native/Sources/TabbyNative/Resources/AIManual/guide-worktrees.png)
 
-[**packagecloud**](https://packagecloud.io) has provided free Debian/RPM repository hosting
+### 6. 知识、模板与 Skills
 
-[![](https://user-images.githubusercontent.com/161476/200423885-7aba2202-fea7-4409-95b9-3a062ce902c7.png)](https://keygen.sh/?via=eugene)
+复用项目背景、知识与流程，检查当前任务实际使用的材料。
 
-[**keygen**](https://keygen.sh/?via=eugene) has provided free release & auto-update hosting
+![知识与记忆](native/Sources/TabbyNative/Resources/AIManual/guide-knowledge.png)
 
-<a href="https://iqhive.com/"><img src="https://iqhive.com/img/icons/logo.svg" width="200"></a>
+![Skills 与项目指引](native/Sources/TabbyNative/Resources/AIManual/guide-skills.png)
 
-[**IQ Hive**](https://iqhive.com) is providing financial support for the project development
+### 7. 权限明确的工具与 MCP
 
+按任务选择执行方式和审批模式，连接 MCP 服务并审查具体工具调用。
 
-<a name="contributing"></a>
-# Contributing
+![执行权限](native/Sources/TabbyNative/Resources/AIManual/guide-permissions.png)
 
-Pull requests and plugins are welcome!
+![MCP 工具审批](native/Sources/TabbyNative/Resources/AIManual/guide-mcp-approval.png)
 
-See [HACKING.md](https://github.com/Eugeny/tabby/blob/master/HACKING.md) and [API docs](https://docs.tabby.sh/) for information of how the project is laid out, and a very brief plugin development tutorial.
+### 8. 用量预算与失败恢复
 
----
-<a name="contributors"></a>
+查看模型用量和预算，停止或恢复任务时核对证据，避免把文件写入误当作服务已经恢复。
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+![用量与预算](native/Sources/TabbyNative/Resources/AIManual/guide-usage.png)
 
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://www.russellmyers.com"><img src="https://avatars2.githubusercontent.com/u/184085?v=4?s=100" width="100px;" alt="Russell Myers"/><br /><sub><b>Russell Myers</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=mezner" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://www.morwire.com"><img src="https://avatars1.githubusercontent.com/u/3991658?v=4?s=100" width="100px;" alt="Austin Warren"/><br /><sub><b>Austin Warren</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ehwarren" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Drachenkaetzchen"><img src="https://avatars1.githubusercontent.com/u/162974?v=4?s=100" width="100px;" alt="Felicia Hummel"/><br /><sub><b>Felicia Hummel</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Drachenkaetzchen" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mikemaccana"><img src="https://avatars2.githubusercontent.com/u/172594?v=4?s=100" width="100px;" alt="Mike MacCana"/><br /><sub><b>Mike MacCana</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=mikemaccana" title="Tests">⚠️</a> <a href="#design-mikemaccana" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/yxuko"><img src="https://avatars1.githubusercontent.com/u/1786317?v=4?s=100" width="100px;" alt="Yacine Kanzari"/><br /><sub><b>Yacine Kanzari</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=yxuko" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/BBJip"><img src="https://avatars2.githubusercontent.com/u/32908927?v=4?s=100" width="100px;" alt="BBJip"/><br /><sub><b>BBJip</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=BBJip" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Futagirl"><img src="https://avatars2.githubusercontent.com/u/33533958?v=4?s=100" width="100px;" alt="Futagirl"/><br /><sub><b>Futagirl</b></sub></a><br /><a href="#design-Futagirl" title="Design">🎨</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.levrik.io"><img src="https://avatars3.githubusercontent.com/u/9491603?v=4?s=100" width="100px;" alt="Levin Rickert"/><br /><sub><b>Levin Rickert</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=levrik" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://kwonoj.github.io"><img src="https://avatars2.githubusercontent.com/u/1210596?v=4?s=100" width="100px;" alt="OJ Kwon"/><br /><sub><b>OJ Kwon</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=kwonoj" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Domain"><img src="https://avatars2.githubusercontent.com/u/903197?v=4?s=100" width="100px;" alt="domain"/><br /><sub><b>domain</b></sub></a><br /><a href="#plugin-Domain" title="Plugin/utility libraries">🔌</a> <a href="https://github.com/Eugeny/tabby/commits?author=Domain" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://www.jbrumond.me"><img src="https://avatars1.githubusercontent.com/u/195127?v=4?s=100" width="100px;" alt="James Brumond"/><br /><sub><b>James Brumond</b></sub></a><br /><a href="#plugin-kbjr" title="Plugin/utility libraries">🔌</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://www.growingwiththeweb.com"><img src="https://avatars0.githubusercontent.com/u/2193314?v=4?s=100" width="100px;" alt="Daniel Imms"/><br /><sub><b>Daniel Imms</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Tyriar" title="Code">💻</a> <a href="#plugin-Tyriar" title="Plugin/utility libraries">🔌</a> <a href="https://github.com/Eugeny/tabby/commits?author=Tyriar" title="Tests">⚠️</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/baflo"><img src="https://avatars2.githubusercontent.com/u/834350?v=4?s=100" width="100px;" alt="Florian Bachmann"/><br /><sub><b>Florian Bachmann</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=baflo" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://michael-kuehnel.de"><img src="https://avatars2.githubusercontent.com/u/441011?v=4?s=100" width="100px;" alt="Michael Kühnel"/><br /><sub><b>Michael Kühnel</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=mischah" title="Code">💻</a> <a href="#design-mischah" title="Design">🎨</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/NieLeben"><img src="https://avatars3.githubusercontent.com/u/47182955?v=4?s=100" width="100px;" alt="Tilmann Meyer"/><br /><sub><b>Tilmann Meyer</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=NieLeben" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://www.jubeat.net"><img src="https://avatars3.githubusercontent.com/u/11289158?v=4?s=100" width="100px;" alt="PM Extra"/><br /><sub><b>PM Extra</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/issues?q=author%3APMExtra" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://jjuhas.keybase.pub//"><img src="https://avatars1.githubusercontent.com/u/6438760?v=4?s=100" width="100px;" alt="Jonathan"/><br /><sub><b>Jonathan</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=IgnusG" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://hans-koch.me"><img src="https://avatars0.githubusercontent.com/u/1093709?v=4?s=100" width="100px;" alt="Hans Koch"/><br /><sub><b>Hans Koch</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=hammster" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://thepuzzlemaker.info"><img src="https://avatars3.githubusercontent.com/u/12666617?v=4?s=100" width="100px;" alt="Dak Smyth"/><br /><sub><b>Dak Smyth</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ThePuzzlemaker" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://yfwz100.github.io"><img src="https://avatars2.githubusercontent.com/u/983211?v=4?s=100" width="100px;" alt="Wang Zhi"/><br /><sub><b>Wang Zhi</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=yfwz100" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/jack1142"><img src="https://avatars0.githubusercontent.com/u/6032823?v=4?s=100" width="100px;" alt="jack1142"/><br /><sub><b>jack1142</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=jack1142" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/hdougie"><img src="https://avatars1.githubusercontent.com/u/450799?v=4?s=100" width="100px;" alt="Howie Douglas"/><br /><sub><b>Howie Douglas</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=hdougie" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://chriskaczor.com"><img src="https://avatars2.githubusercontent.com/u/180906?v=4?s=100" width="100px;" alt="Chris Kaczor"/><br /><sub><b>Chris Kaczor</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ckaczor" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.boxmein.net"><img src="https://avatars1.githubusercontent.com/u/358714?v=4?s=100" width="100px;" alt="Johannes Kadak"/><br /><sub><b>Johannes Kadak</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=boxmein" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LeSeulArtichaut"><img src="https://avatars1.githubusercontent.com/u/38361244?v=4?s=100" width="100px;" alt="LeSeulArtichaut"/><br /><sub><b>LeSeulArtichaut</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=LeSeulArtichaut" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/CyrilTaylor"><img src="https://avatars0.githubusercontent.com/u/12631466?v=4?s=100" width="100px;" alt="Cyril Taylor"/><br /><sub><b>Cyril Taylor</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=CyrilTaylor" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/nstefanou"><img src="https://avatars3.githubusercontent.com/u/51129173?v=4?s=100" width="100px;" alt="nstefanou"/><br /><sub><b>nstefanou</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=nstefanou" title="Code">💻</a> <a href="#plugin-nstefanou" title="Plugin/utility libraries">🔌</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/orin220444"><img src="https://avatars3.githubusercontent.com/u/30747229?v=4?s=100" width="100px;" alt="orin220444"/><br /><sub><b>orin220444</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=orin220444" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Goobles"><img src="https://avatars3.githubusercontent.com/u/8776771?v=4?s=100" width="100px;" alt="Gobius Dolhain"/><br /><sub><b>Gobius Dolhain</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Goobles" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/3l0w"><img src="https://avatars2.githubusercontent.com/u/37798980?v=4?s=100" width="100px;" alt="Gwilherm Folliot"/><br /><sub><b>Gwilherm Folliot</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=3l0w" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Dimitory"><img src="https://avatars0.githubusercontent.com/u/475955?v=4?s=100" width="100px;" alt="Dmitry Pronin"/><br /><sub><b>Dmitry Pronin</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=dimitory" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/JonathanBeverley"><img src="https://avatars1.githubusercontent.com/u/20328966?v=4?s=100" width="100px;" alt="Jonathan Beverley"/><br /><sub><b>Jonathan Beverley</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=JonathanBeverley" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/zend"><img src="https://avatars1.githubusercontent.com/u/25160?v=4?s=100" width="100px;" alt="Zenghai Liang"/><br /><sub><b>Zenghai Liang</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=zend" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://about.me/matishadow"><img src="https://avatars0.githubusercontent.com/u/9083085?v=4?s=100" width="100px;" alt="Mateusz Tracz"/><br /><sub><b>Mateusz Tracz</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=matishadow" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://zergpool.com"><img src="https://avatars3.githubusercontent.com/u/36234677?v=4?s=100" width="100px;" alt="pinpin"/><br /><sub><b>pinpin</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=pinpins" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/TakuroOnoda"><img src="https://avatars0.githubusercontent.com/u/1407926?v=4?s=100" width="100px;" alt="Takuro Onoda"/><br /><sub><b>Takuro Onoda</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=TakuroOnoda" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/frauhottelmann"><img src="https://avatars2.githubusercontent.com/u/902705?v=4?s=100" width="100px;" alt="frauhottelmann"/><br /><sub><b>frauhottelmann</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=frauhottelmann" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://patalong.pl"><img src="https://avatars.githubusercontent.com/u/29167842?v=4?s=100" width="100px;" alt="Piotr Patalong"/><br /><sub><b>Piotr Patalong</b></sub></a><br /><a href="#design-VectorKappa" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/clarkwang"><img src="https://avatars.githubusercontent.com/u/157076?v=4?s=100" width="100px;" alt="Clark Wang"/><br /><sub><b>Clark Wang</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=clarkwang" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/iamchating"><img src="https://avatars.githubusercontent.com/u/7088153?v=4?s=100" width="100px;" alt="iamchating"/><br /><sub><b>iamchating</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=iamchating" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/starxg"><img src="https://avatars.githubusercontent.com/u/34997494?v=4?s=100" width="100px;" alt="starxg"/><br /><sub><b>starxg</b></sub></a><br /><a href="#plugin-starxg" title="Plugin/utility libraries">🔌</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://hashnote.net/"><img src="https://avatars.githubusercontent.com/u/546312?v=4?s=100" width="100px;" alt="Alisue"/><br /><sub><b>Alisue</b></sub></a><br /><a href="#design-lambdalisue" title="Design">🎨</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ydcool"><img src="https://avatars.githubusercontent.com/u/5668295?v=4?s=100" width="100px;" alt="Dominic Yin"/><br /><sub><b>Dominic Yin</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ydcool" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/bdr99"><img src="https://avatars.githubusercontent.com/u/2292715?v=4?s=100" width="100px;" alt="Brandon Rothweiler"/><br /><sub><b>Brandon Rothweiler</b></sub></a><br /><a href="#design-bdr99" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://git.io/JnP49"><img src="https://avatars.githubusercontent.com/u/63876444?v=4?s=100" width="100px;" alt="Logic Machine"/><br /><sub><b>Logic Machine</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=logicmachine123" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/cypherbits"><img src="https://avatars.githubusercontent.com/u/10424900?v=4?s=100" width="100px;" alt="cypherbits"/><br /><sub><b>cypherbits</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=cypherbits" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://modulolotus.net"><img src="https://avatars.githubusercontent.com/u/946421?v=4?s=100" width="100px;" alt="Matthew Davidson"/><br /><sub><b>Matthew Davidson</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=KingMob" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/al-wi"><img src="https://avatars.githubusercontent.com/u/11092199?v=4?s=100" width="100px;" alt="Alexander Wiedemann"/><br /><sub><b>Alexander Wiedemann</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=al-wi" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.notion.so/3d45c6bd2cbd4f938873a4bd12e23375"><img src="https://avatars.githubusercontent.com/u/59506394?v=4?s=100" width="100px;" alt="장보연"/><br /><sub><b>장보연</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=BoYeonJang" title="Documentation">📖</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Me1onRind"><img src="https://avatars.githubusercontent.com/u/19531270?v=4?s=100" width="100px;" alt="zZ"/><br /><sub><b>zZ</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Me1onRind" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/tainoNZ"><img src="https://avatars.githubusercontent.com/u/49261322?v=4?s=100" width="100px;" alt="Aaron Davison"/><br /><sub><b>Aaron Davison</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=tainoNZ" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/composer404"><img src="https://avatars.githubusercontent.com/u/58251560?v=4?s=100" width="100px;" alt="Przemyslaw Kozik"/><br /><sub><b>Przemyslaw Kozik</b></sub></a><br /><a href="#design-composer404" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/highfredo"><img src="https://avatars.githubusercontent.com/u/5951524?v=4?s=100" width="100px;" alt="Alfredo Arellano de la Fuente"/><br /><sub><b>Alfredo Arellano de la Fuente</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=highfredo" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/NessunKim"><img src="https://avatars.githubusercontent.com/u/12974079?v=4?s=100" width="100px;" alt="MH Kim"/><br /><sub><b>MH Kim</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=NessunKim" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://discord.gg/4c5EVTBhtp"><img src="https://avatars.githubusercontent.com/u/40345645?v=4?s=100" width="100px;" alt="Marmota"/><br /><sub><b>Marmota</b></sub></a><br /><a href="#design-jaimeadf" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://ares.zone"><img src="https://avatars.githubusercontent.com/u/40336192?v=4?s=100" width="100px;" alt="Ares Andrew"/><br /><sub><b>Ares Andrew</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=TENX-S" title="Documentation">📖</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://usual.io/"><img src="https://avatars.githubusercontent.com/u/780052?v=4?s=100" width="100px;" alt="George Korsnick"/><br /><sub><b>George Korsnick</b></sub></a><br /><a href="#financial-gkor" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://about.me/ulu"><img src="https://avatars.githubusercontent.com/u/872764?v=4?s=100" width="100px;" alt="Artem Smirnov"/><br /><sub><b>Artem Smirnov</b></sub></a><br /><a href="#financial-uluhonolulu" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/nevotheless"><img src="https://avatars.githubusercontent.com/u/779797?v=4?s=100" width="100px;" alt="Tim Kopplow"/><br /><sub><b>Tim Kopplow</b></sub></a><br /><a href="#financial-nevotheless" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mrthock"><img src="https://avatars.githubusercontent.com/u/88901709?v=4?s=100" width="100px;" alt="mrthock"/><br /><sub><b>mrthock</b></sub></a><br /><a href="#financial-mrthock" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/lrottach"><img src="https://avatars.githubusercontent.com/u/50323692?v=4?s=100" width="100px;" alt="Lukas Rottach"/><br /><sub><b>Lukas Rottach</b></sub></a><br /><a href="#financial-lrottach" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/boonkerz"><img src="https://avatars.githubusercontent.com/u/277321?v=4?s=100" width="100px;" alt="boonkerz"/><br /><sub><b>boonkerz</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=boonkerz" title="Code">💻</a> <a href="#translation-boonkerz" title="Translation">🌍</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/milotype"><img src="https://avatars.githubusercontent.com/u/43657314?v=4?s=100" width="100px;" alt="Milo Ivir"/><br /><sub><b>Milo Ivir</b></sub></a><br /><a href="#translation-milotype" title="Translation">🌍</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/JasonCubic"><img src="https://avatars.githubusercontent.com/u/8921015?v=4?s=100" width="100px;" alt="JasonCubic"/><br /><sub><b>JasonCubic</b></sub></a><br /><a href="#design-JasonCubic" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/MaxWaldorf"><img src="https://avatars.githubusercontent.com/u/15877853?v=4?s=100" width="100px;" alt="MaxWaldorf"/><br /><sub><b>MaxWaldorf</b></sub></a><br /><a href="#infra-MaxWaldorf" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mwz"><img src="https://avatars.githubusercontent.com/u/1190768?v=4?s=100" width="100px;" alt="Michael Wizner"/><br /><sub><b>Michael Wizner</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=mwz" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/mgrulich"><img src="https://avatars.githubusercontent.com/u/781036?v=4?s=100" width="100px;" alt="Martin"/><br /><sub><b>Martin</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=mgrulich" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/piersandro"><img src="https://avatars.githubusercontent.com/u/19996309?v=4?s=100" width="100px;" alt="Piersandro Guerrera"/><br /><sub><b>Piersandro Guerrera</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=piersandro" title="Documentation">📖</a> <a href="#translation-piersandro" title="Translation">🌍</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/0x973"><img src="https://avatars.githubusercontent.com/u/19320096?v=4?s=100" width="100px;" alt="0x973"/><br /><sub><b>0x973</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=0x973" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Allenator"><img src="https://avatars.githubusercontent.com/u/11794943?v=4?s=100" width="100px;" alt="Allenator"/><br /><sub><b>Allenator</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Allenator" title="Documentation">📖</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://microhobby.com.br/blog"><img src="https://avatars.githubusercontent.com/u/2633321?v=4?s=100" width="100px;" alt="Matheus Castello"/><br /><sub><b>Matheus Castello</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=microhobby" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Jai-JAP"><img src="https://avatars.githubusercontent.com/u/78354625?v=4?s=100" width="100px;" alt="Jai A P"/><br /><sub><b>Jai A P</b></sub></a><br /><a href="#platform-Jai-JAP" title="Packaging/porting to new platform">📦</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://blog.ysc3839.com"><img src="https://avatars.githubusercontent.com/u/12028138?v=4?s=100" width="100px;" alt="Richard Yu"/><br /><sub><b>Richard Yu</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ysc3839" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/artu-ole"><img src="https://avatars.githubusercontent.com/u/15938416?v=4?s=100" width="100px;" alt="artu-ole"/><br /><sub><b>artu-ole</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=artu-ole" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://timagribanov.github.io/"><img src="https://avatars.githubusercontent.com/u/48593815?v=4?s=100" width="100px;" alt="Timofey Gribanov"/><br /><sub><b>Timofey Gribanov</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=TimaGribanov" title="Documentation">📖</a> <a href="#translation-TimaGribanov" title="Translation">🌍</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://git.christianbingman.com"><img src="https://avatars.githubusercontent.com/u/42191425?v=4?s=100" width="100px;" alt="Christian Bingman"/><br /><sub><b>Christian Bingman</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ChristianBingman" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://zhangzhipeng2023.cn/"><img src="https://avatars.githubusercontent.com/u/5310853?v=4?s=100" width="100px;" alt="zhipeng"/><br /><sub><b>zhipeng</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Ox0400" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/woodmeal"><img src="https://avatars.githubusercontent.com/u/104011197?v=4?s=100" width="100px;" alt="woodmeal"/><br /><sub><b>woodmeal</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=woodmeal" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://magiclike.codeberg.page/"><img src="https://avatars.githubusercontent.com/u/82117109?v=4?s=100" width="100px;" alt="MagicLike"/><br /><sub><b>MagicLike</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=MagicLike" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/hisamafahri"><img src="https://avatars.githubusercontent.com/u/65691613?v=4?s=100" width="100px;" alt="Hisam Fahri"/><br /><sub><b>Hisam Fahri</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=hisamafahri" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://liangchengj.com"><img src="https://avatars.githubusercontent.com/u/48881023?v=4?s=100" width="100px;" alt="Liangcheng Juves"/><br /><sub><b>Liangcheng Juves</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=LiangchengJ" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/attet"><img src="https://avatars.githubusercontent.com/u/1911416?v=4?s=100" width="100px;" alt="Atte Timonen"/><br /><sub><b>Atte Timonen</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=attet" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/joaolmpinto/"><img src="https://avatars.githubusercontent.com/u/1143125?v=4?s=100" width="100px;" alt="João Pinto"/><br /><sub><b>João Pinto</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=joaompinto" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Qiming-Liu"><img src="https://avatars.githubusercontent.com/u/68600416?v=4?s=100" width="100px;" alt="Alan"/><br /><sub><b>Alan</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Qiming-Liu" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://74th.tech/"><img src="https://avatars.githubusercontent.com/u/1060011?v=4?s=100" width="100px;" alt="Atsushi Morimoto"/><br /><sub><b>Atsushi Morimoto</b></sub></a><br /><a href="#financial-74th" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://arles.red/"><img src="https://avatars.githubusercontent.com/u/5369096?v=4?s=100" width="100px;" alt="Arles"/><br /><sub><b>Arles</b></sub></a><br /><a href="#financial-aarles" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://pentestbook.six2dez.com/"><img src="https://avatars.githubusercontent.com/u/24670991?v=4?s=100" width="100px;" alt="six2dez"/><br /><sub><b>six2dez</b></sub></a><br /><a href="#financial-six2dez" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/CandiceJoy"><img src="https://avatars.githubusercontent.com/u/8854890?v=4?s=100" width="100px;" alt="Candice"/><br /><sub><b>Candice</b></sub></a><br /><a href="#financial-CandiceJoy" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/kingrowen"><img src="https://avatars.githubusercontent.com/u/13178700?v=4?s=100" width="100px;" alt="Rowen Willabus"/><br /><sub><b>Rowen Willabus</b></sub></a><br /><a href="#financial-kingrowen" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://hengy1.top/"><img src="https://avatars.githubusercontent.com/u/98681454?v=4?s=100" width="100px;" alt="HengY1Coding✨"/><br /><sub><b>HengY1Coding✨</b></sub></a><br /><a href="#financial-HengY1Sky" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/FrancisHG"><img src="https://avatars.githubusercontent.com/u/1611626?v=4?s=100" width="100px;" alt="Francis Gelderloos"/><br /><sub><b>Francis Gelderloos</b></sub></a><br /><a href="#financial-FrancisHG" title="Financial">💵</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/astromasoud"><img src="https://avatars.githubusercontent.com/u/18737721?v=4?s=100" width="100px;" alt="astromasoud"/><br /><sub><b>astromasoud</b></sub></a><br /><a href="#financial-astromasoud" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://spirit55555.dk/"><img src="https://avatars.githubusercontent.com/u/2357565?v=4?s=100" width="100px;" alt="Anders G. Jørgensen"/><br /><sub><b>Anders G. Jørgensen</b></sub></a><br /><a href="#financial-Spirit55555" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/djradon"><img src="https://avatars.githubusercontent.com/u/5224156?v=4?s=100" width="100px;" alt="Dave Richardson"/><br /><sub><b>Dave Richardson</b></sub></a><br /><a href="#financial-djradon" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://twitter.com/tpberntsen"><img src="https://avatars.githubusercontent.com/u/922318?v=4?s=100" width="100px;" alt="Thomas Peter Berntsen"/><br /><sub><b>Thomas Peter Berntsen</b></sub></a><br /><a href="#financial-tpberntsen" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://bandism.net/"><img src="https://avatars.githubusercontent.com/u/22633385?v=4?s=100" width="100px;" alt="Ikko Ashimine"/><br /><sub><b>Ikko Ashimine</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=eltociear" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/giejqf"><img src="https://avatars.githubusercontent.com/u/9211230?v=4?s=100" width="100px;" alt="giejqf"/><br /><sub><b>giejqf</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=giejqf" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LacazeThomas"><img src="https://avatars.githubusercontent.com/u/19855907?v=4?s=100" width="100px;" alt="Thomas LACAZE"/><br /><sub><b>Thomas LACAZE</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=LacazeThomas" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://pochen.me/"><img src="https://avatars.githubusercontent.com/u/1329716?v=4?s=100" width="100px;" alt="Po Chen"/><br /><sub><b>Po Chen</b></sub></a><br /><a href="#financial-princemaple" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://victorchandra.carrd.co/"><img src="https://avatars.githubusercontent.com/u/41635105?v=4?s=100" width="100px;" alt="Victor Chandra"/><br /><sub><b>Victor Chandra</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=mzmznasipadang" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/daniel347x"><img src="https://avatars.githubusercontent.com/u/309746?v=4?s=100" width="100px;" alt="Dan Nissenbaum"/><br /><sub><b>Dan Nissenbaum</b></sub></a><br /><a href="#financial-daniel347x" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/DunklerPhoenix"><img src="https://avatars.githubusercontent.com/u/1261305?v=4?s=100" width="100px;" alt="RogueThorn"/><br /><sub><b>RogueThorn</b></sub></a><br /><a href="#financial-DunklerPhoenix" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://spenserblack.github.io"><img src="https://avatars.githubusercontent.com/u/8546709?v=4?s=100" width="100px;" alt="Spenser Black"/><br /><sub><b>Spenser Black</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=spenserblack" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/zuedev"><img src="https://avatars.githubusercontent.com/u/24614929?v=4?s=100" width="100px;" alt="Alex"/><br /><sub><b>Alex</b></sub></a><br /><a href="#financial-zuedev" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://hengy1.top/"><img src="https://avatars.githubusercontent.com/u/98681454?v=4?s=100" width="100px;" alt="HengY1Coding✨"/><br /><sub><b>HengY1Coding✨</b></sub></a><br /><a href="#financial-HengY1Cola" title="Financial">💵</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.stackscale.com/"><img src="https://avatars.githubusercontent.com/u/195768?v=4?s=100" width="100px;" alt="David Carrero"/><br /><sub><b>David Carrero</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=dcarrero" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/zhoro"><img src="https://avatars.githubusercontent.com/u/1105687?v=4?s=100" width="100px;" alt="Andrii Zhovtiak"/><br /><sub><b>Andrii Zhovtiak</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=zhoro" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/JohnMasoner"><img src="https://avatars.githubusercontent.com/u/42313377?v=4?s=100" width="100px;" alt="Mason Ma"/><br /><sub><b>Mason Ma</b></sub></a><br /><a href="#financial-JohnMasoner" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ntimo"><img src="https://avatars.githubusercontent.com/u/6145026?v=4?s=100" width="100px;" alt="Timo"/><br /><sub><b>Timo</b></sub></a><br /><a href="#financial-ntimo" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/evinwatson/"><img src="https://avatars.githubusercontent.com/u/24227251?v=4?s=100" width="100px;" alt="Evin Watson"/><br /><sub><b>Evin Watson</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=EvinRWatson" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://t.me/hendrjl"><img src="https://avatars.githubusercontent.com/u/15981200?v=4?s=100" width="100px;" alt="Hendra Juli"/><br /><sub><b>Hendra Juli</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=deulizealand" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/wkricowski"><img src="https://avatars.githubusercontent.com/u/36803521?v=4?s=100" width="100px;" alt="Wellinton Kricowski"/><br /><sub><b>Wellinton Kricowski</b></sub></a><br /><a href="#financial-wkricowski" title="Financial">💵</a> <a href="https://github.com/Eugeny/tabby/commits?author=wkricowski" title="Documentation">📖</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/almzau"><img src="https://avatars.githubusercontent.com/u/29115846?v=4?s=100" width="100px;" alt="Allan"/><br /><sub><b>Allan</b></sub></a><br /><a href="#design-almzau" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://oidamo.de"><img src="https://avatars.githubusercontent.com/u/17959794?v=4?s=100" width="100px;" alt="Benjamin Brandmeier"/><br /><sub><b>Benjamin Brandmeier</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=BenjaminBrandmeier" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/patric1025"><img src="https://avatars.githubusercontent.com/u/65654040?v=4?s=100" width="100px;" alt="patric1025"/><br /><sub><b>patric1025</b></sub></a><br /><a href="#translation-patric1025" title="Translation">🌍</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/hermitpopcorn"><img src="https://avatars.githubusercontent.com/u/16042129?v=4?s=100" width="100px;" alt="hermitpopcorn"/><br /><sub><b>hermitpopcorn</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=hermitpopcorn" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://joshuatz.com/"><img src="https://avatars.githubusercontent.com/u/17817563?v=4?s=100" width="100px;" alt="Joshua Tzucker"/><br /><sub><b>Joshua Tzucker</b></sub></a><br /><a href="#financial-joshuatz" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/luxifr"><img src="https://avatars.githubusercontent.com/u/665715?v=4?s=100" width="100px;" alt="luxifr"/><br /><sub><b>luxifr</b></sub></a><br /><a href="#financial-luxifr" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ukulanne"><img src="https://avatars.githubusercontent.com/u/28586666?v=4?s=100" width="100px;" alt="Anne Summers"/><br /><sub><b>Anne Summers</b></sub></a><br /><a href="#financial-ukulanne" title="Financial">💵</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Clem-Fern"><img src="https://avatars.githubusercontent.com/u/20025949?v=4?s=100" width="100px;" alt="Clem"/><br /><sub><b>Clem</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Clem-Fern" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/elizabeth-dev"><img src="https://avatars.githubusercontent.com/u/13015727?v=4?s=100" width="100px;" alt="Elizabeth Martín Campos"/><br /><sub><b>Elizabeth Martín Campos</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=elizabeth-dev" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/siccous"><img src="https://avatars.githubusercontent.com/u/7812885?v=4?s=100" width="100px;" alt="Tomáš Hruška"/><br /><sub><b>Tomáš Hruška</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=siccous" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/karaketir16"><img src="https://avatars.githubusercontent.com/u/27349806?v=4?s=100" width="100px;" alt="Osman Karaketir"/><br /><sub><b>Osman Karaketir</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=karaketir16" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.gnomegarden.io/"><img src="https://avatars.githubusercontent.com/u/33667144?v=4?s=100" width="100px;" alt="Crypto Gnome"/><br /><sub><b>Crypto Gnome</b></sub></a><br /><a href="#financial-CryptoGnome" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/rbukovansky"><img src="https://avatars.githubusercontent.com/u/1004491?v=4?s=100" width="100px;" alt="Richard Bukovansky"/><br /><sub><b>Richard Bukovansky</b></sub></a><br /><a href="#financial-rbukovansky" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/pseudocc"><img src="https://avatars.githubusercontent.com/u/85104110?v=4?s=100" width="100px;" alt="catlas"/><br /><sub><b>catlas</b></sub></a><br /><a href="#financial-pseudocc" title="Financial">💵</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="http://kapocsi.ca"><img src="https://avatars.githubusercontent.com/u/84490604?v=4?s=100" width="100px;" alt="Thomas Kapocsi"/><br /><sub><b>Thomas Kapocsi</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Kapocsi" title="Documentation">📖</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://dylhack.dev/"><img src="https://avatars.githubusercontent.com/u/27179786?v=4?s=100" width="100px;" alt="Dylan Hackworth"/><br /><sub><b>Dylan Hackworth</b></sub></a><br /><a href="#financial-dylhack" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/echo304"><img src="https://avatars.githubusercontent.com/u/16456651?v=4?s=100" width="100px;" alt="Sangboak Lee"/><br /><sub><b>Sangboak Lee</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=echo304" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/qyecst"><img src="https://avatars.githubusercontent.com/u/13901864?v=4?s=100" width="100px;" alt="qyecst"/><br /><sub><b>qyecst</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=qyecst" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/DehanLUO"><img src="https://avatars.githubusercontent.com/u/53093688?v=4?s=100" width="100px;" alt="Han"/><br /><sub><b>Han</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=DehanLUO" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/wljince007"><img src="https://avatars.githubusercontent.com/u/88243938?v=4?s=100" width="100px;" alt="wljince007"/><br /><sub><b>wljince007</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=wljince007" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/FeroTheFox"><img src="https://avatars.githubusercontent.com/u/52982404?v=4?s=100" width="100px;" alt="fero"/><br /><sub><b>fero</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=FeroTheFox" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://siebsie23.nl/"><img src="https://avatars.githubusercontent.com/u/25083973?v=4?s=100" width="100px;" alt="Sibren"/><br /><sub><b>Sibren</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=siebsie23" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.nathaniel-walser.com"><img src="https://avatars.githubusercontent.com/u/33339996?v=4?s=100" width="100px;" alt="Nathaniel Walser"/><br /><sub><b>Nathaniel Walser</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=nwalser" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/aaronhuggins"><img src="https://avatars.githubusercontent.com/u/16567111?v=4?s=100" width="100px;" alt="Aaron Huggins"/><br /><sub><b>Aaron Huggins</b></sub></a><br /><a href="#design-aaronhuggins" title="Design">🎨</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://zkxdex.github.io/"><img src="https://avatars.githubusercontent.com/u/66271780?v=4?s=100" width="100px;" alt="KDex"/><br /><sub><b>KDex</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=zKXDEX" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/kimbob13"><img src="https://avatars.githubusercontent.com/u/26755098?v=4?s=100" width="100px;" alt="ChangHwan Kim"/><br /><sub><b>ChangHwan Kim</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=kimbob13" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ashneilson"><img src="https://avatars.githubusercontent.com/u/35913512?v=4?s=100" width="100px;" alt="Ash Neilson"/><br /><sub><b>Ash Neilson</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ashneilson" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/cfs4819"><img src="https://avatars.githubusercontent.com/u/53071761?v=4?s=100" width="100px;" alt="Chen Fansong"/><br /><sub><b>Chen Fansong</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=cfs4819" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://5k.work/"><img src="https://avatars.githubusercontent.com/u/82694310?v=4?s=100" width="100px;" alt="Mxmilu"/><br /><sub><b>Mxmilu</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=Mxmilu666" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://cbuff.dev"><img src="https://avatars.githubusercontent.com/u/29805363?v=4?s=100" width="100px;" alt="Charles Buffington"/><br /><sub><b>Charles Buffington</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=C41M50N" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/GeminiLn"><img src="https://avatars.githubusercontent.com/u/12425057?v=4?s=100" width="100px;" alt="Yu Qin"/><br /><sub><b>Yu Qin</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=GeminiLn" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/fireblue"><img src="https://avatars.githubusercontent.com/u/1034929?v=4?s=100" width="100px;" alt="fireblue"/><br /><sub><b>fireblue</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=fireblue" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/marko1616"><img src="https://avatars.githubusercontent.com/u/45327989?v=4?s=100" width="100px;" alt="marko1616"/><br /><sub><b>marko1616</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=marko1616" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.selfhosted.sg/"><img src="https://avatars.githubusercontent.com/u/128927132?v=4?s=100" width="100px;" alt="SelfHosted"/><br /><sub><b>SelfHosted</b></sub></a><br /><a href="#financial-SelfHosted-Club" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://hiroga.hatenablog.com/"><img src="https://avatars.githubusercontent.com/u/13391129?v=4?s=100" width="100px;" alt="Hiroaki Ogasawara"/><br /><sub><b>Hiroaki Ogasawara</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=xhiroga" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/geodic"><img src="https://avatars.githubusercontent.com/u/64704703?v=4?s=100" width="100px;" alt="geodic"/><br /><sub><b>geodic</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=geodic" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://p.foundation/"><img src="https://avatars.githubusercontent.com/u/80860929?v=4?s=100" width="100px;" alt="P Foundation"/><br /><sub><b>P Foundation</b></sub></a><br /><a href="#financial-pfoundation" title="Financial">💵</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/et304383"><img src="https://avatars.githubusercontent.com/u/2693414?v=4?s=100" width="100px;" alt="et304383"/><br /><sub><b>et304383</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=et304383" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ajkrj"><img src="https://avatars.githubusercontent.com/u/210226755?v=4?s=100" width="100px;" alt="ajkrj"/><br /><sub><b>ajkrj</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ajkrj" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/leoberbert/"><img src="https://avatars.githubusercontent.com/u/16724862?v=4?s=100" width="100px;" alt="Leonardo Berbert"/><br /><sub><b>Leonardo Berbert</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=leoberbert" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ToastyTheBot"><img src="https://avatars.githubusercontent.com/u/270965193?v=4?s=100" width="100px;" alt="ToastyTheBot"/><br /><sub><b>ToastyTheBot</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=ToastyTheBot" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/superm1"><img src="https://avatars.githubusercontent.com/u/494526?v=4?s=100" width="100px;" alt="Mario Limonciello"/><br /><sub><b>Mario Limonciello</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=superm1" title="Code">💻</a></td>
-    </tr>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/puneetdixit200"><img src="https://avatars.githubusercontent.com/u/236133619?v=4?s=100" width="100px;" alt="Puneet Dixit"/><br /><sub><b>Puneet Dixit</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=puneetdixit200" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/balajieswaramoorthi"><img src="https://avatars.githubusercontent.com/u/212661894?v=4?s=100" width="100px;" alt="Balaji Eswaramoorthi"/><br /><sub><b>Balaji Eswaramoorthi</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=balajieswaramoorthi" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/linzack"><img src="https://avatars.githubusercontent.com/u/8398628?v=4?s=100" width="100px;" alt="linzack"/><br /><sub><b>linzack</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=linzack" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/anseltaft"><img src="https://avatars.githubusercontent.com/u/5069775?v=4?s=100" width="100px;" alt="Ansel Taft"/><br /><sub><b>Ansel Taft</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=anseltaft" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="http://liewstar.cn"><img src="https://avatars.githubusercontent.com/u/93535922?v=4?s=100" width="100px;" alt="Liao Xin"/><br /><sub><b>Liao Xin</b></sub></a><br /><a href="https://github.com/Eugeny/tabby/commits?author=liewstar" title="Code">💻</a></td>
-    </tr>
-  </tbody>
-</table>
+![任务恢复与验收](native/Sources/TabbyNative/Resources/AIManual/guide-recovery.png)
 
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
+### 9. 内置离线图文手册
 
-<!-- ALL-CONTRIBUTORS-LIST:END -->
+24 章涵盖首次配置到开发、运维与恢复，支持搜索、图片放大和示例复制。
 
-This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome!
+![离线图文手册](native/Documentation/ManualScreenshots/ui-0.19.21-start-1060.png)
 
-场景窗口使用最外层终端、SFTP、日志标签，顶栏「保存场景」保存当前终端与分屏、已打开目录和日志。
+## 数据与能力边界
 
-操作历史：新开本地或 SSH 的 Bash/Zsh 终端后自动启用当前会话记录，无需手动填写 Shell 配置。在「日志 → 操作历史」按服务器查看命令、时间，支持搜索、复制及仅填入复用。本机最多保留1000条，可暂停／清空，不修改Shell配置文件。Bash依赖Shell历史，关闭历史或忽略的命令不会记录，记录时间为返回提示符时；Zsh记录执行开始时间。交互密码输入不采集，明显凭据命令过滤，其他敏感内容可先暂停记录。
+- 配置位于 `~/Library/Application Support/TabbyNative/`，主工作区为 `workspace.json`；密码、私钥口令、私钥文本和 API Key 使用 macOS 钥匙串。
+- AI 请求会将所选上下文发送给已配置服务。自动脱敏不能替代发送前检查；会话输出日志默认关闭，开启后可能包含终端回显的敏感内容。
+- 当前终端模式共享正在运行的 Shell / REPL；独立执行模式不继承交互 Shell 的别名、虚拟环境和后续目录变化。停止任务不会自动撤销已完成修改。
+- 命令正则规则不是操作系统沙箱；远端认证、权限及工具可用性仍决定执行结果。
+- 持久会话需要服务端 tmux 3.3+ 和 Bash；批量超时需要 `timeout` / `gtimeout`。监控主要面向 Linux。
+- 尚不提供云端团队协作、移动端、mosh、PKCS#11、键盘交互认证和 ProxyCommand。原生版与 Tabby Electron 的功能集合不同。
+- 当前打包流程支持本机签名或 ad-hoc 签名；公开分发的 Developer ID 公证需另行完成。
+
+## 源码构建
+
+原生工程在 `native/`，依赖由 Swift Package Manager 管理，解析版本保存在 `Package.resolved`，Citadel / NIOSSH 补丁见 [Vendor 说明](native/Vendor/README.md)。使用具备兼容 Swift 工具链的 Xcode，在仓库根目录运行：
+
+```sh
+git clone https://github.com/fenghlkevin/tabby.git
+cd tabby
+git checkout main
+swift build --package-path native
+swift test --package-path native
+native/scripts/package.sh release
+open native/dist/Axon.app
+```
+
+产物为 `native/dist/Axon.app` 和 `native/dist/Axon-0.19.29-mac-arm64.zip`。打包脚本执行签名校验；可使用 `AXON_SIGN_IDENTITY` 指定签名身份。生成产物不作为源码提交。
+
+SSH / SFTP 集成测试需要临时本地测试服务器；未配置时相关测试会跳过。设置步骤和覆盖范围见 [原生工程开发说明](native/README.md#集成测试)。UI 和交付检查记录见 [VERIFICATION.md](native/VERIFICATION.md)。
+
+## 仓库导航
+
+| 路径 | 内容 |
+| --- | --- |
+| `native/Sources/TabbyNative/` | Axon 原生应用源码 |
+| `native/Tests/` | 单元、集成及原生界面测试 |
+| `native/Sources/TabbyNative/Resources/AIManual/` | 随应用离线打包的手册与配图 |
+| `native/AI-ASSISTANT-MANUAL.md` | 24 章 AI 操作手册 |
+| `native/scripts/` | 打包、测试服务器及手册资源生成脚本 |
+| `native/Vendor/` | 固定版本依赖补丁与许可证说明 |
+| `app/`、`tabby-*` | 保留的 Tabby Web / Electron 工程 |
+
+本仓库同时保留上游 Tabby Web / Electron 源码；其介绍与开发入口见 [Tabby 原始 README](README.tabby.md)，其他语言的 `README.*.md` 仍为上游文档。
+
+## 开源许可
+
+仓库基于 MIT 许可证，详见 [LICENSE](LICENSE)。SwiftTerm、Citadel、Yams 及其他第三方依赖的许可由打包流程汇总到应用内 `ThirdPartyNotices`；修改过的依赖另见 [Vendor/README.md](native/Vendor/README.md)。
