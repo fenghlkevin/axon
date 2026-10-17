@@ -10,7 +10,35 @@ Axon 使用 SwiftUI / AppKit 构建，终端基于 SwiftTerm，SSH / SFTP 基于
 
 当前源码打包版本：**0.19.29（194）**。运行环境：**Apple Silicon · macOS 15+**。版本以 [打包脚本](native/scripts/package.sh) 为准。
 
-[快速开始](#快速开始) · [全部功能](#全部功能) · [特色功能与截图](#特色功能与截图) · [源码构建](#源码构建) · [使用手册](native/AI-ASSISTANT-MANUAL.md)
+[界面全景](#界面全景) · [快速开始](#快速开始) · [全部功能](#全部功能) · [特色功能与截图](#特色功能与截图) · [源码构建](#源码构建) · [使用手册](native/AI-ASSISTANT-MANUAL.md)
+
+## 界面全景
+
+以下四张为当前源码通过原生 SwiftUI / AppKit 渲染的完整工作区截图，保留顶部标签、导航和主要内容。主机、终端输出、AI 回答和任务结果均为文档示例数据；文件管理展示本地双栏模式，未连接真实服务器。点击图片可查看原图。
+
+### 主机工作台
+
+在统一侧栏中管理主机、监控、凭据、转发、代码片段和工作场景；主区域按分组浏览服务器。
+
+![Axon 主机工作台全景](docs/screenshots/axon-hosts.png)
+
+### 终端与 AI 助手
+
+左侧保留完整终端，右侧结合当前上下文分析输出、持续追问，并按权限执行任务。
+
+![Axon 终端与 AI 助手全景](docs/screenshots/axon-terminal-ai.png)
+
+### 双栏文件管理
+
+文件工作区支持本地 / 本地和本地 / SFTP 双栏；此图展示两份示例目录，包含路径导航、文件列表与操作入口。
+
+![Axon 双栏文件管理全景](docs/screenshots/axon-files.png)
+
+### 批量运维工作台
+
+在同一页面选择目标、编写命令、配置并发与超时，并查看各主机结果和输出。
+
+![Axon 批量任务全景](docs/screenshots/axon-batch.png)
 
 ## 快速开始
 
@@ -165,9 +193,9 @@ Axon 使用 SwiftUI / AppKit 构建，终端基于 SwiftTerm，SSH / SFTP 基于
 原生工程在 `native/`，依赖由 Swift Package Manager 管理，解析版本保存在 `Package.resolved`，Citadel / NIOSSH 补丁见 [Vendor 说明](native/Vendor/README.md)。使用具备兼容 Swift 工具链的 Xcode，在仓库根目录运行：
 
 ```sh
-git clone https://github.com/fenghlkevin/tabby.git
-cd tabby
-git checkout main
+git clone https://github.com/fenghlkevin/axon.git
+cd axon
+git checkout master
 swift build --package-path native
 swift test --package-path native
 native/scripts/package.sh release
