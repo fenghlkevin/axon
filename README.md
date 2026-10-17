@@ -188,9 +188,9 @@ SSH / SFTP 集成测试需要临时本地测试服务器；未配置时相关测
 | `native/AI-ASSISTANT-MANUAL.md` | 24 章 AI 操作手册 |
 | `native/scripts/` | 打包、测试服务器及手册资源生成脚本 |
 | `native/Vendor/` | 固定版本依赖补丁与许可证说明 |
-| `app/`、`tabby-*` | 保留的 Tabby Web / Electron 工程 |
+| `docs/TABBY-MIGRATION.md` | 旧 Tabby 归档位置与配置迁移说明 |
 
-本仓库同时保留上游 Tabby Web / Electron 源码；其介绍与开发入口见 [Tabby 原始 README](README.tabby.md)，其他语言的 `README.*.md` 仍为上游文档。
+主分支仅维护 Axon。原 Tabby Web / Electron 工程已归档至 `archive/tabby-legacy-2026-10-17` 分支；归档范围、查阅方式和配置迁移步骤见 [Tabby 迁移说明](docs/TABBY-MIGRATION.md)。
 
 ## 开源许可
 

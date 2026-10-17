@@ -1,42 +1,16 @@
-app/node_modules
-app/assets/webpack
-
-node_modules
-
-build/files.wxs
-dist
-*/dist
-*/typings
-*.tsbuildinfo
-
-*.xcworkspacedata
-*.xcuserstate
-*.wixpdb
-
+# macOS and local IDE state
 .DS_Store
 .DS_Store?
-
-coverage
-.nyc_output
-npm-debug.log
-
-builtin-plugins
-package-lock.json
-yarn-error.log
-
-docs/api
-.travis.ssh.key
-*.code-workspace
 .idea/
+*.code-workspace
 
-.electron-symbols
-sentry.properties
-sentry-symbols.js
+# Swift / Xcode user state
+*.xcworkspacedata
+*.xcuserstate
 
-*.psd
+# Generated distribution artifacts (including native/dist)
+dist/
 
-crowdin.yml
-.crowdin.env
-
-# built from tabby-uac/ by CI; see .github/workflows/build.yml
-extras/UAC.exe
+# Local credentials and environment overrides
+.env
+.env.*
