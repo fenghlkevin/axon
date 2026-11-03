@@ -1858,3 +1858,18 @@ Running after: 12973
 - 已生成并亲自打开实际渲染截图 /tmp/axon-inspector-194/host-inspector-open-1050.png、host-inspector-closed-1400.png；实际截图与无障碍布局审计覆盖开/关两种窗口宽度。动画存在由实际中间帧布局采样验证，不仅依靠静态截图。没有向用户服务器发起连接或命令。
 - release 0.19.29 (194) 构建、严格签名和 ZIP 完整性校验通过，暂存校验后原子安装到 /Applications/Axon.app。旧版备份 native/dist/backups/Axon-0.19.28-193-20261014-145658.app。
 - 未退出、启动或重启应用；安装前后运行 PID 均为 75421，保留当前进程。用户主动重启后加载新版动画。
+
+## 2026-11-03 · 终端选中复制与右键粘贴 · 0.19.30 (195)
+
+- 修复选区非空时绕过右键粘贴并打开系统菜单的问题。开启右键粘贴后，有无选区均直接调用既有粘贴流程，并激活当前终端和输入焦点；关闭该设置时保留原上下文菜单行为。选中即复制及多行粘贴确认流程保持原有实现。
+- 新增 TerminalMouseInteractionTests，在真实 AppKit 窗口及 RemoteTerminal 上验证选择后 mouseUp 自动复制、有选区右键进入粘贴且不请求菜单、选区存在时读取新的剪贴板内容、无选区右键、关闭设置不触发粘贴，以及当前会话和 firstResponder。粘贴入口以测试替身记录，未向真实 shell/SSH 发送数据；触控板双指点击对应的 rightMouseDown 事件通过合成 NSEvent 验证，未进行物理触控板操作。
+- `swift test --package-path native --filter 'TerminalMouseInteractionTests|PreferencesTests|ContextClickTests'` 通过 34 项，0 失败；包含既有多行确认、取消、修剪粘贴回归。`git diff --check` 通过。
+- 已亲自打开检查真实终端在 600/1000pt 宽度下的选区截图：/tmp/axon-terminal-right-click-600.png、/tmp/axon-terminal-right-click-1000.png。选中内容清晰，右键后未请求菜单。只展示测试缓冲区，不连接用户服务器。
+- 未安装、未启动或重启用户应用；现有会话未主动中断。
+- Release 0.19.30 (195) 已打包：native/dist/Axon-0.19.30-mac-arm64.zip。`codesign --verify --deep --strict native/dist/Axon.app` 与 `unzip -t` 均通过；发布构建存在既有并发及废弃 API 警告，无构建错误。
+
+### 0.19.30 安装补充
+
+- 用户明确授权本机安装及 GitHub 提交/Release 发布。已备份 0.19.29 (194) 到 native/dist/backups/Axon-0.19.29-194-20261103-150823.app。
+- 使用 install-current.py 暂存校验并原子替换 /Applications/Axon.app 为 0.19.30 (195)，安装后严格签名、版本、可执行文件 SHA-256 校验通过，保留用户白色图标。ZIP SHA-256：7d8d5d5670e958e8afb4a0b70d377ae582e1ecb11971e20be62538ac427e2896。
+- 未退出、启动或重启应用；新版将在用户下次主动启动时加载。

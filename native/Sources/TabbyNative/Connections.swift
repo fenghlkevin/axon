@@ -557,7 +557,13 @@ extension Optional {
         TerminalPaste.perform(text, preferences: store?.workspace.preferences ?? Preferences(), confirm: { TerminalPaste.confirm($0, chinese: store?.chinese == true, window: window) }, send: pasteText)
     }
     override func rightMouseDown(with event: NSEvent) {
-        if store?.workspace.preferences.rightClickPaste == true && getSelection()?.isEmpty != false { paste(self) } else { super.rightMouseDown(with: event) }
+        if store?.workspace.preferences.rightClickPaste == true {
+            if let sessionID { store?.activeSession = sessionID }
+            window?.makeFirstResponder(self)
+            paste(self)
+        } else {
+            super.rightMouseDown(with: event)
+        }
     }
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event)?.copy() as? NSMenu ?? NSMenu()
